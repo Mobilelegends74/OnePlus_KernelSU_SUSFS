@@ -408,10 +408,21 @@ runs:
 
         UPREV_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000-linux-6.1.118-to-6.1.176.patch.xz"
         UPREV_SHA256="0208cf96d88a2a6fb94399909e8f1b34c46e16ad95114a3b2cdbe0072cfac229"
+        UPREV_RAW="$RUNNER_TEMP/op13r-linux-6.1.118-to-6.1.176.patch"
+        UPREV_RAW_SHA256="1d75708e36b881a0e4a81edbcb7494f4a2513faafef9f0c46ef4d942e1fed0c0"
 
         echo "$UPREV_SHA256  $UPREV_PATCH" | sha256sum --check --strict
-        xz --decompress --stdout "$UPREV_PATCH" | git apply --check --whitespace=nowarn -
-        xz --decompress --stdout "$UPREV_PATCH" | git apply --whitespace=nowarn -
+        xz --decompress --stdout "$UPREV_PATCH" > "$UPREV_RAW"
+        echo "$UPREV_RAW_SHA256  $UPREV_RAW" | sha256sum --check --strict
+
+        # Kernel sources are extracted from archives and have no local .git directory.
+        # Using git apply here would discover the enclosing workflow checkout and skip
+        # its ignored build tree, so apply directly to the extracted source instead.
+        patch --dry-run --batch --forward --fuzz=0 --silent -p1 < "$UPREV_RAW"
+        patch --batch --forward --fuzz=0 --silent -p1 < "$UPREV_RAW"
+
+        # Preserve the only executable file introduced by this upstream range.
+        chmod 0755 tools/testing/selftests/ublk/test_stripe_04.sh
 
         echo "Resulting kernel version fields:"
         grep -E '^(VERSION|PATCHLEVEL|SUBLEVEL)[[:space:]]*=' Makefile
