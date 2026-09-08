@@ -926,7 +926,16 @@ runs:
           return 1
         }
         
+        # Keep this dependency reproducible: the current upstream main removed the
+        # pershoot SUSFS compatibility patches that this workflow still consumes.
+        KERNEL_PATCHES_REF="757201d983e2549dc7945a21fa6a056eb2e55263"
+        cd "$GITHUB_WORKSPACE"
         retry_clone "https://github.com/WildKernels/kernel_patches.git" "main" "1"
+        git -C "$KERNEL_PATCHES_FOLDER" fetch --depth 1 origin "$KERNEL_PATCHES_REF"
+        git -C "$KERNEL_PATCHES_FOLDER" checkout --detach FETCH_HEAD
+
+        test -f "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0001-pershoot-Allow-core-to-be-built-with-no-features.patch"
+        test -f "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0002-pershoot-Implement-SuSFS-and-Toolkit-coexistence.patch"
 
         
         if [ "${{ env.OP_SUSFS }}" = true ]; then
