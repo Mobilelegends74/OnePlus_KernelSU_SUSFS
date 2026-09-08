@@ -1,0 +1,57 @@
+diff --git a/certs/extract-cert.c b/certs/extract-cert.c
+index 35fa247..5be4b99 100644
+--- a/certs/extract-cert.c
++++ b/certs/extract-cert.c
+@@ -79,5 +79,3 @@ static void drain_openssl_errors(void)
+-#ifdef USE_PKCS11_ENGINE
+ static const char *key_pass;
+-#endif
+ static BIO *wb;
+ static char *cert_dst;
+@@ -108,5 +106,3 @@ int main(int argc, char **argv)
+-#ifdef USE_PKCS11_ENGINE
+ 	key_pass = getenv("KBUILD_SIGN_PIN");
+-#endif
+ 
+ 	if (argc != 3)
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index 3ffd947..8f24136 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -1573,12 +1573,20 @@ struct task_struct {
+ #ifdef CONFIG_SLIM_SCHED
+ 	ANDROID_KABI_USE(2, unsigned long sched_prop);
+ 	ANDROID_KABI_USE(3, struct sched_ext_entity *scx);
++	ANDROID_KABI_USE(4, struct task_dma_buf_info *dmabuf_info);
++	ANDROID_KABI_USE(5, struct {
++		/* Save user-dumpable when mm goes away */
++		unsigned user_dumpable:1;
++		});
+ #else
+-	ANDROID_KABI_RESERVE(2);
+-	ANDROID_KABI_RESERVE(3);
+-#endif
++	ANDROID_KABI_USE(2, struct task_dma_buf_info *dmabuf_info);
++	ANDROID_KABI_USE(3, struct {
++		/* Save user-dumpable when mm goes away */
++		unsigned user_dumpable:1;
++		});
+ 	ANDROID_KABI_RESERVE(4);
+ 	ANDROID_KABI_RESERVE(5);
++#endif
+ 	ANDROID_KABI_RESERVE(6);
+ 	ANDROID_KABI_RESERVE(7);
+ 	ANDROID_KABI_RESERVE(8);
+diff --git a/kernel/cgroup/cgroup.c b/kernel/cgroup/cgroup.c
+index 030881f..04de32b 100644
+--- a/kernel/cgroup/cgroup.c
++++ b/kernel/cgroup/cgroup.c
+@@ -5541,7 +5541,7 @@ static void css_release(struct percpu_ref *ref)
+		work_data_bits(&css->destroy_work))) {
+ 		local_irq_restore(flags);
+ 		INIT_WORK(&css->destroy_work, css_release_work_fn);
+-		queue_work(cgroup_destroy_wq, &css->destroy_work);
++		queue_work(cgroup_release_wq, &css->destroy_work);
+ 	} else {
+ 		local_irq_restore(flags);
+ 	}

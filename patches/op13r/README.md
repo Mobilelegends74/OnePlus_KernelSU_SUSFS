@@ -21,6 +21,13 @@ of the newer OnePlus F2FS and Android KABI adaptations.
 
 Upstream: <https://android.googlesource.com/kernel/common/+/2f2512ac1091bb2b28c20306fa86d890e8f3f01f..2cee2416baae662580c7ce03bbe53d1c8f23d203>
 
+`0000a-linux-6.1.176-oneplus-merge-fixes.patch` resolves three integration
+points where Android 6.1.176 reuses KABI/workqueue state also customized by the
+OnePlus tree. It preserves the OnePlus Slim Scheduler fields while allocating
+the new DMA-BUF and dumpability state from the next available KABI reserves,
+selects the new cgroup release workqueue, and keeps `extract-cert` compatible
+with the runner's OpenSSL 3 headers.
+
 ## BORE
 
 `0001-sched-bore-5.3.0-android14-6.1.patch` integrates the BORE 5.3.0 scheduler
