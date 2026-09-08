@@ -43,6 +43,11 @@ lookup modes, and keeps valid block/node accounting consistent with the Android
 6.1.176 implementation. The resolutions are cross-checked against the official
 OnePlus 6.1.141 F2FS integration where the update ranges overlap.
 
+`0000e-android-6.1.176-f2fs-lock-context.patch` adapts the remaining OnePlus
+deduplication and extended-attribute paths to the lock-context API introduced
+by the newer F2FS code, and completes the new length-aware block invalidation
+calls.
+
 ## BORE
 
 `0001-sched-bore-5.3.0-android14-6.1.patch` integrates the BORE 5.3.0 scheduler

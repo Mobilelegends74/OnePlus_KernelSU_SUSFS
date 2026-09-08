@@ -413,6 +413,7 @@ runs:
         MERGE_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000a-linux-6.1.176-oneplus-merge-fixes.patch"
         VENDOR_HOOK_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000c-android-6.1.176-vendor-hooks.patch"
         F2FS_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000d-android-6.1.176-f2fs-merge-fixes.patch"
+        F2FS_LOCK_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000e-android-6.1.176-f2fs-lock-context.patch"
 
         echo "$UPREV_SHA256  $UPREV_PATCH" | sha256sum --check --strict
         xz --decompress --stdout "$UPREV_PATCH" > "$UPREV_RAW"
@@ -432,6 +433,9 @@ runs:
 
         patch --dry-run --batch --forward --fuzz=0 --silent -p1 < "$F2FS_FIX_PATCH"
         patch --batch --forward --fuzz=0 --silent -p1 < "$F2FS_FIX_PATCH"
+
+        patch --dry-run --batch --forward --fuzz=0 --silent -p1 < "$F2FS_LOCK_FIX_PATCH"
+        patch --batch --forward --fuzz=0 --silent -p1 < "$F2FS_LOCK_FIX_PATCH"
 
         # Preserve the only executable file introduced by this upstream range.
         chmod 0755 tools/testing/selftests/ublk/test_stripe_04.sh

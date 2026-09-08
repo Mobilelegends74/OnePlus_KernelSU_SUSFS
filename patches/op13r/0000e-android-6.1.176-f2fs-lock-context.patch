@@ -1,0 +1,232 @@
+diff --git a/fs/f2fs/file.c b/fs/f2fs/file.c
+index cf3aef0..a8b60f7 100755
+--- a/fs/f2fs/file.c
++++ b/fs/f2fs/file.c
+@@ -192,16 +192,17 @@ repeat:
+ static int __revoke_deduped_inode_begin(struct inode *dedup)
+ {
+ 	struct f2fs_sb_info *sbi = F2FS_I_SB(dedup);
++	struct f2fs_lock_context lc;
+ 	int err;
+ 
+-	f2fs_lock_op(sbi);
++	f2fs_lock_op(sbi, &lc);
+ 
+ 	if (time_to_inject(sbi, FAULT_DEDUP_ORPHAN_INODE))
+ 		err = -ENOSPC;
+ 	else
+ 		err = f2fs_acquire_orphan_inode(sbi);	/* for layer inode */
+ 	if (err) {
+-		f2fs_unlock_op(sbi);
++		f2fs_unlock_op(sbi, &lc);
+ 		f2fs_err(sbi, "revoke inode[%lu] begin fail, ret:%d",
+ 			dedup->i_ino, err);
+ 		return err;
+@@ -211,7 +212,7 @@ static int __revoke_deduped_inode_begin(struct inode *dedup)
+ 
+ 	set_inode_flag(dedup, FI_REVOKE_DEDUP);
+ 
+-	f2fs_unlock_op(sbi);
++	f2fs_unlock_op(sbi, &lc);
+ 
+ 	return 0;
+ }
+@@ -249,10 +250,11 @@ static int __revoke_deduped_inode_end(struct inode *dedup)
+ {
+ 	struct f2fs_sb_info *sbi = F2FS_I_SB(dedup);
+ 	struct f2fs_inode_info *fi = F2FS_I(dedup);
++	struct f2fs_lock_context lc;
+ 	struct inode *inner = NULL;
+ 	int err;
+ 
+-	f2fs_lock_op(sbi);
++	f2fs_lock_op(sbi, &lc);
+ 
+ 	f2fs_remove_orphan_inode(sbi, dedup->i_ino);
+ 
+@@ -285,7 +287,7 @@ static int __revoke_deduped_inode_end(struct inode *dedup)
+ 	} else {
+ 		f2fs_drop_deduped_link(inner);
+ 	}
+-	f2fs_unlock_op(sbi);
++	f2fs_unlock_op(sbi, &lc);
+ 
+ 	trace_f2fs_dedup_revoke_inode(dedup, inner);
+ 
+@@ -433,12 +435,13 @@ static int __revoke_deduped_data(struct inode *dedup)
+ static void _revoke_error_handle(struct inode *inode)
+ {
+ 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
++	struct f2fs_lock_context lc;
+ 
+-	f2fs_lock_op(sbi);
++	f2fs_lock_op(sbi, &lc);
+ 	f2fs_truncate_dedup_inode(inode, FI_REVOKE_DEDUP);
+ 	f2fs_remove_orphan_inode(sbi, inode->i_ino);
+ 	F2FS_I(inode)->dedup_cp_ver = cur_cp_version(F2FS_CKPT(sbi));
+-	f2fs_unlock_op(sbi);
++	f2fs_unlock_op(sbi, &lc);
+ 	trace_f2fs_dedup_revoke_fail(inode, F2FS_I(inode)->inner_inode);
+ }
+ 
+@@ -1192,13 +1195,14 @@ static int __f2fs_ioc_create_layered_inode(struct inode *inode,
+ 		struct inode *inner_inode)
+ {
+ 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
++	struct f2fs_lock_context lc;
+ 	int ret;
+ 	struct f2fs_inode_info *fi = F2FS_I(inode);
+ 
+ 	if (!dedup_file_is_same(inode, inner_inode, DEDUP_COMPARE_PAGES))
+ 		return -ESTALE;
+ 
+-	f2fs_lock_op(sbi);
++	f2fs_lock_op(sbi, &lc);
+ 
+ 	if (time_to_inject(sbi, FAULT_DEDUP_ORPHAN_INODE))
+ 		ret = -ENOSPC;
+@@ -1208,7 +1212,7 @@ static int __f2fs_ioc_create_layered_inode(struct inode *inode,
+ 		f2fs_err(sbi,
+ 			"create layer file acquire orphan fail, ino[%lu], inner[%lu]",
+ 			inode->i_ino, inner_inode->i_ino);
+-		f2fs_unlock_op(sbi);
++		f2fs_unlock_op(sbi, &lc);
+ 		return ret;
+ 	}
+ 	f2fs_add_orphan_inode(inode);
+@@ -1229,7 +1233,7 @@ static int __f2fs_ioc_create_layered_inode(struct inode *inode,
+ 	f2fs_up_write(&fi->i_sem);
+ 
+ 	f2fs_remove_orphan_inode(sbi, inner_inode->i_ino);
+-	f2fs_unlock_op(sbi);
++	f2fs_unlock_op(sbi, &lc);
+ 
+ 	wait_event(fi->dedup_wq,
+ 			atomic_read(&fi->inflight_read_io) == 0);
+@@ -1241,7 +1245,7 @@ static int __f2fs_ioc_create_layered_inode(struct inode *inode,
+ 	if (ret)
+ 		goto out;
+ 
+-	f2fs_lock_op(sbi);
++	f2fs_lock_op(sbi, &lc);
+ 	f2fs_remove_orphan_inode(sbi, inode->i_ino);
+ 	ret = f2fs_truncate_dedup_inode(inode, FI_DOING_DEDUP);
+ 	/*
+@@ -1249,7 +1253,7 @@ static int __f2fs_ioc_create_layered_inode(struct inode *inode,
+ 	 * we set cp_ver here to let fsync know dedup have finish.
+ 	 */
+ 	F2FS_I(inode)->dedup_cp_ver = cur_cp_version(F2FS_CKPT(sbi));
+-	f2fs_unlock_op(sbi);
++	f2fs_unlock_op(sbi, &lc);
+ 
+ out:
+ 	f2fs_up_write(&fi->i_gc_rwsem[WRITE]);
+@@ -1353,6 +1357,7 @@ static int __f2fs_ioc_dedup_file(struct inode *base_inode,
+ 		struct inode *dedup_inode)
+ {
+ 	struct f2fs_sb_info *sbi = F2FS_I_SB(dedup_inode);
++	struct f2fs_lock_context lc;
+ 	struct inode *inner = get_inner_inode(base_inode);
+ 	int ret = 0;
+ 	struct f2fs_inode_info *fi = F2FS_I(dedup_inode);
+@@ -1367,14 +1372,14 @@ static int __f2fs_ioc_dedup_file(struct inode *base_inode,
+ 		return -ESTALE;
+ 	}
+ skip:
+-	f2fs_lock_op(sbi);
++	f2fs_lock_op(sbi, &lc);
+ 
+ 	if (time_to_inject(sbi, FAULT_DEDUP_ORPHAN_INODE))
+ 		ret = -ENOSPC;
+ 	else
+ 		ret = f2fs_acquire_orphan_inode(sbi);
+ 	if (ret) {
+-		f2fs_unlock_op(sbi);
++		f2fs_unlock_op(sbi, &lc);
+ 		f2fs_err(sbi,
+ 			"dedup file acquire orphan fail, ino[%lu], base ino[%lu]",
+ 			dedup_inode->i_ino, base_inode->i_ino);
+@@ -1392,7 +1397,7 @@ skip:
+ 	f2fs_down_write(&F2FS_I(inner)->i_sem);
+ 	f2fs_i_links_write(inner, true);
+ 	f2fs_up_write(&F2FS_I(inner)->i_sem);
+-	f2fs_unlock_op(sbi);
++	f2fs_unlock_op(sbi, &lc);
+ 
+ 	wait_event(fi->dedup_wq,
+ 			atomic_read(&fi->inflight_read_io) == 0);
+@@ -1404,7 +1409,7 @@ skip:
+ 	if (ret)
+ 		goto out;
+ 
+-	f2fs_lock_op(sbi);
++	f2fs_lock_op(sbi, &lc);
+ 	f2fs_remove_orphan_inode(sbi, dedup_inode->i_ino);
+ 	ret = f2fs_truncate_dedup_inode(dedup_inode, FI_DOING_DEDUP);
+ 	/*
+@@ -1412,7 +1417,7 @@ skip:
+ 	 * we set cp_ver here to let fsync know dedup have finish.
+ 	 */
+ 	F2FS_I(dedup_inode)->dedup_cp_ver = cur_cp_version(F2FS_CKPT(sbi));
+-	f2fs_unlock_op(sbi);
++	f2fs_unlock_op(sbi, &lc);
+ out:
+ 	f2fs_up_write(&fi->i_gc_rwsem[WRITE]);
+ 	f2fs_dedup_info(sbi, "%s inode[%lu] dedup success, inner[%lu], ret[%d]",
+@@ -2427,7 +2432,7 @@ void f2fs_truncate_data_blocks_range(struct dnode_of_data *dn, int count)
+ 				valid_blocks++;
+ 		}
+ 
+-		f2fs_invalidate_blocks(sbi, blkaddr);
++		f2fs_invalidate_blocks(sbi, blkaddr, 1);
+ 
+ 		if (!released || blkaddr != COMPRESS_ADDR)
+ 			nr_free++;
+@@ -3371,7 +3376,7 @@ static int f2fs_do_zero_range(struct dnode_of_data *dn, pgoff_t start,
+ 			break;
+ 		}
+ 
+-		f2fs_invalidate_blocks(sbi, dn->data_blkaddr);
++		f2fs_invalidate_blocks(sbi, dn->data_blkaddr, 1);
+ #ifdef CONFIG_F2FS_FS_SEQZONE
+ 		if (f2fs_seqzone_file(dn->inode))
+ 			dn->seqzone_index = NULL_ADDR;
+@@ -8013,6 +8018,7 @@ static int f2fs_ioc_set_extra_attr(struct file *filp, unsigned long arg)
+ {
+ 	struct inode *inode = file_inode(filp);
+ 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
++	struct f2fs_lock_context lc;
+ 	struct f2fs_extra_attr attr;
+ 	struct page *ipage;
+ 	void *inline_addr;
+@@ -8047,7 +8053,7 @@ static int f2fs_ioc_set_extra_attr(struct file *filp, unsigned long arg)
+ 		    attr.attr > MAX_INLINE_XATTR_SIZE)
+ 			return -EINVAL;
+ 		inode_lock(inode);
+-		f2fs_lock_op(sbi);
++		f2fs_lock_op(sbi, &lc);
+ 		f2fs_down_write(&F2FS_I(inode)->i_xattr_sem);
+ 		if (i_size_read(inode) || F2FS_I(inode)->i_xattr_nid) {
+ 			/*
+@@ -8082,7 +8088,7 @@ static int f2fs_ioc_set_extra_attr(struct file *filp, unsigned long arg)
+ 		f2fs_put_page(ipage, 1);
+ xattr_out_unlock:
+ 		f2fs_up_write(&F2FS_I(inode)->i_xattr_sem);
+-		f2fs_unlock_op(sbi);
++		f2fs_unlock_op(sbi, &lc);
+ 		inode_unlock(inode);
+ 		if (!ret)
+ 			f2fs_balance_fs(sbi, true);
+diff --git a/fs/f2fs/inode.c b/fs/f2fs/inode.c
+index 7ecee91..55c7d95 100644
+--- a/fs/f2fs/inode.c
++++ b/fs/f2fs/inode.c
+@@ -932,7 +932,7 @@ retry:
+ 
+ 		f2fs_lock_op(sbi, &lc);
+ 		err = f2fs_remove_inode_page(inode);
+-		f2fs_unlock_op(sbi);
++		f2fs_unlock_op(sbi, &lc);
+ #ifdef CONFIG_F2FS_FS_DEDUP
+ 		if (f2fs_is_outer_inode(inode))
+ 			f2fs_dec_inner_link(inode);
