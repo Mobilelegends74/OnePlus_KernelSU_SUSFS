@@ -32,6 +32,11 @@ with the runner's OpenSSL 3 headers.
 in KABI reserves 6-8 after the Android 6.1.176 and OnePlus fields have occupied
 the earlier reserves.
 
+`0000c-android-6.1.176-vendor-hooks.patch` restores the Android 6.1.176 MM and
+VMSCAN vendor-hook declarations lost where the OnePlus hook extensions overlap
+the LTS update. It also preserves the original filemap range start required by
+the new `android_vh_filemap_map_pages_range` hook.
+
 ## BORE
 
 `0001-sched-bore-5.3.0-android14-6.1.patch` integrates the BORE 5.3.0 scheduler
