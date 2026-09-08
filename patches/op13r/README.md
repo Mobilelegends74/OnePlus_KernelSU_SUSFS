@@ -37,6 +37,12 @@ VMSCAN vendor-hook declarations lost where the OnePlus hook extensions overlap
 the LTS update. It also preserves the original filemap range start required by
 the new `android_vh_filemap_map_pages_range` hook.
 
+`0000d-android-6.1.176-f2fs-merge-fixes.patch` completes the overlapping F2FS
+API transition to ranged cache invalidation, restores the packed allocation and
+lookup modes, and keeps valid block/node accounting consistent with the Android
+6.1.176 implementation. The resolutions are cross-checked against the official
+OnePlus 6.1.141 F2FS integration where the update ranges overlap.
+
 ## BORE
 
 `0001-sched-bore-5.3.0-android14-6.1.patch` integrates the BORE 5.3.0 scheduler
