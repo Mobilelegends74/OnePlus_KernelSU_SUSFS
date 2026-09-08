@@ -28,6 +28,10 @@ the new DMA-BUF and dumpability state from the next available KABI reserves,
 selects the new cgroup release workqueue, and keeps `extract-cert` compatible
 with the runner's OpenSSL 3 headers.
 
+`0000b-droidspaces-kabi-after-6.1.176.patch` keeps Droidspaces SYSVIPC state
+in KABI reserves 6-8 after the Android 6.1.176 and OnePlus fields have occupied
+the earlier reserves.
+
 ## BORE
 
 `0001-sched-bore-5.3.0-android14-6.1.patch` integrates the BORE 5.3.0 scheduler

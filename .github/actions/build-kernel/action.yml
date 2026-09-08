@@ -1939,7 +1939,10 @@ runs:
         cd "$COMMON_KERNEL_FOLDER"
         
         echo "Applying patch to enable SYSVIPC without breaking ABI"
-        case "$OP_BRANCH" in
+        if [ "$OP_MODEL" = "OP13r" ]; then
+          patch --batch --forward --fuzz=0 -p1 < "$GITHUB_WORKSPACE/action-source/patches/op13r/0000b-droidspaces-kabi-after-6.1.176.patch"
+        else
+          case "$OP_BRANCH" in
           wild/sm8850|wild/sm8845)
             patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/common/droidspaces/fix_sysvipc_kabi_a16-6.12.patch"
             ;;
@@ -1957,7 +1960,8 @@ runs:
           *)
             patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/common/droidspaces/fix_sysvipc_kabi_6_7_8.patch"
             ;;
-        esac
+          esac
+        fi
         
         echo "Patch to fix kernel panic caused by oplus_bsp_midas"
         patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/common/droidspaces/0001-Return-ghost-task-if-task-is-null-and-is-requested-b.patch"
