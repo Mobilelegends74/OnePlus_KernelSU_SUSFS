@@ -4,6 +4,23 @@ These patches target the OnePlus Android 14 Linux 6.1 common kernel selected by
 `manifests/a15/oneplus_13r_v.xml` at source revision
 `7b9a23054ab0ada2886ed34a2137b9d0312891ff`.
 
+## Android LTS 6.1.176 uprev
+
+`0000-linux-6.1.118-to-6.1.176.patch.xz` updates the pinned OnePlus Linux
+6.1.118 source to the Android 14 Linux 6.1.176 LTS level before any local
+KernelSU, SUSFS or performance patches are applied. The delta is based on the
+official Android common range below and resolves overlapping changes in favor
+of the newer OnePlus F2FS and Android KABI adaptations.
+
+- Android 6.1.118 base tag:
+  `2f2512ac1091bb2b28c20306fa86d890e8f3f01f`
+- Android 6.1.176 LTS merge:
+  `2cee2416baae662580c7ce03bbe53d1c8f23d203`
+- Compressed patch SHA-256:
+  `0208cf96d88a2a6fb94399909e8f1b34c46e16ad95114a3b2cdbe0072cfac229`
+
+Upstream: <https://android.googlesource.com/kernel/common/+/2f2512ac1091bb2b28c20306fa86d890e8f3f01f..2cee2416baae662580c7ce03bbe53d1c8f23d203>
+
 ## BORE
 
 `0001-sched-bore-5.3.0-android14-6.1.patch` integrates the BORE 5.3.0 scheduler

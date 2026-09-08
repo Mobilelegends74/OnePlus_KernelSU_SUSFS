@@ -388,6 +388,40 @@ runs:
         echo "${KERNEL_PLATFORM_FOLDER}/prebuilts/kernel-build-tools/linux-x86/bin/" >> $GITHUB_PATH
         echo "${KERNEL_PLATFORM_FOLDER}/prebuilts/kernel-build-tools/linux_musl-x86/bin/" >> $GITHUB_PATH
 
+    - name: Apply OP13R Android LTS 6.1.176 uprev
+      shell: bash
+      if: ${{ env.OP_MODEL == 'OP13r' && env.OP_OS_VERSION == 'A15' && env.OP_KERNEL_VERSION == '6.1' }}
+      run: |
+        set -euo pipefail
+        echo "::group::Apply OP13R Linux 6.1.176 uprev"
+
+        cd "$COMMON_KERNEL_FOLDER"
+        VERSION=$(awk '$1 == "VERSION" { print $3 }' Makefile)
+        PATCHLEVEL=$(awk '$1 == "PATCHLEVEL" { print $3 }' Makefile)
+        SUBLEVEL=$(awk '$1 == "SUBLEVEL" { print $3 }' Makefile)
+        BASE_VERSION="$VERSION.$PATCHLEVEL.$SUBLEVEL"
+
+        if [ "$BASE_VERSION" != "6.1.118" ]; then
+          echo "::error::OP13R uprev requires the pinned Linux 6.1.118 base; found $BASE_VERSION"
+          exit 1
+        fi
+
+        UPREV_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000-linux-6.1.118-to-6.1.176.patch.xz"
+        UPREV_SHA256="0208cf96d88a2a6fb94399909e8f1b34c46e16ad95114a3b2cdbe0072cfac229"
+
+        echo "$UPREV_SHA256  $UPREV_PATCH" | sha256sum --check --strict
+        xz --decompress --stdout "$UPREV_PATCH" | git apply --check --whitespace=nowarn -
+        xz --decompress --stdout "$UPREV_PATCH" | git apply --whitespace=nowarn -
+
+        SUBLEVEL=$(awk '$1 == "SUBLEVEL" { print $3 }' Makefile)
+        if [ "$SUBLEVEL" != "176" ]; then
+          echo "::error::OP13R uprev did not produce Linux 6.1.176"
+          exit 1
+        fi
+
+        echo "✅ OP13R kernel updated from Linux 6.1.118 to 6.1.176"
+        echo "::endgroup::"
+
     - name: Get Kernel Version Info
       shell: bash
       run: |
@@ -441,7 +475,7 @@ runs:
         fi
         echo "::endgroup::"
 
-    - name: Verify OP13R OOS15 6.1.118 Base
+    - name: Verify OP13R OOS15 6.1.176 Upstream Level
       shell: bash
       run: |
         set -euo pipefail
@@ -460,12 +494,12 @@ runs:
           exit 1
         fi
 
-        if [ "$TKERNEL_VER" != "6.1.118" ]; then
-          echo "::error::Kernel source is no longer 6.1.118: $TKERNEL_VER"
+        if [ "$TKERNEL_VER" != "6.1.176" ]; then
+          echo "::error::Kernel uprev did not produce 6.1.176: $TKERNEL_VER"
           exit 1
         fi
 
-        echo "✅ Correct OP13R OxygenOS 15 / Linux 6.1.118 base"
+        echo "✅ Correct OP13R OxygenOS 15 / Linux 6.1.176 upstream level"
 
     - name: 🏷️ Set Build Identity (Hardcoded)
       shell: bash
