@@ -1298,6 +1298,15 @@ runs:
             echo "#include <linux/dma-buf.h> Line not found. Adding missing header"
             sed -i '/#include <linux\/cpufreq_times.h>/a #include <linux\/dma-buf.h>' ./fs/proc/base.c
           fi
+
+          # The OnePlus tree carries this Android vendor hook immediately after
+          # internal.h. Move it ahead of the stable SUSFS include context so the
+          # upstream SUSFS namespace hunk applies cleanly without dropping either.
+          if [ "$OP_MODEL" = "OP13r" ] && [ "$TKERNEL_VER" = "6.1.176" ] && \
+             grep -qxF '#include <trace/hooks/blk.h>' ./fs/namespace.c; then
+            sed -i '\|^#include <trace/hooks/blk.h>$|d' ./fs/namespace.c
+            sed -i '\|^#include <linux/fs_context.h>$|i #include <trace/hooks/blk.h>' ./fs/namespace.c
+          fi
         fi
         
         patch -p1 --forward < "$SUSFS_FOLDER/kernel_patches/50_add_susfs_in_${{ env.SUSFS_KERNEL_BRANCH }}.patch"
