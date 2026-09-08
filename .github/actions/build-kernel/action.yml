@@ -413,8 +413,9 @@ runs:
         xz --decompress --stdout "$UPREV_PATCH" | git apply --check --whitespace=nowarn -
         xz --decompress --stdout "$UPREV_PATCH" | git apply --whitespace=nowarn -
 
-        SUBLEVEL=$(awk '$1 == "SUBLEVEL" { print $3 }' Makefile)
-        if [ "$SUBLEVEL" != "176" ]; then
+        echo "Resulting kernel version fields:"
+        grep -E '^(VERSION|PATCHLEVEL|SUBLEVEL)[[:space:]]*=' Makefile
+        if ! grep -Eq '^SUBLEVEL[[:space:]]*=[[:space:]]*176[[:space:]]*$' Makefile; then
           echo "::error::OP13R uprev did not produce Linux 6.1.176"
           exit 1
         fi
