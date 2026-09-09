@@ -12,6 +12,21 @@
 
 ---
 
+## OP13R / Linux 6.1.176
+
+This branch, `OP13R-6.1.176v1`, is based on
+[`OP13R-6.1.118v1`](https://github.com/Mobilelegends74/OnePlus_KernelSU_SUSFS/tree/OP13R-6.1.118v1).
+It updates the pinned OnePlus Android 14 kernel to Linux 6.1.176 while retaining
+the OP13R OxygenOS 15 configuration and the existing root/performance features.
+
+Builds and release packaging run in
+[GitHub Actions](https://github.com/Mobilelegends74/OnePlus_KernelSU_SUSFS/actions/workflows/build-kernel-release.yml).
+See the [LTS integration notes](patches/op13r/README.md) for pinned sources,
+merge fixes and static checks. A successful CI build is not an on-device boot
+or vendor-module compatibility test. Keep a known-good boot image for recovery.
+
+---
+
 ## ⚠️ Disclaimer
 
 Flashing this kernel will not void your warranty, but there is always a risk of bricking your device. Please make sure to:
@@ -134,4 +149,3 @@ If you encounter any issues or need help, feel free to:
 [![Telegram Group](https://img.shields.io/badge/Telegram-WildKernels-blue?logo=telegram)](https://t.me/WildKernelsTG)
 
 </div>
-

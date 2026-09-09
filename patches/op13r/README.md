@@ -59,9 +59,21 @@ free paths own exactly one extension. The patch also restores compressed-page
 writeback accounting and raw-cluster locking while retaining OnePlus's fixed
 decompression arrays and fixed-output layout.
 
+`0000h-android-6.1.176-file-operations.patch` restores compressed-block
+reservation ordering, direct-I/O synchronization and pinned-file write checks.
+VFS-facing open/release wrappers account for the new donation-cache lifetime
+without counting internal OnePlus dedup recursion or failed-open cleanup.
+It also pairs trace-path allocations with `f2fs_putname`, exposes linear-lookup
+support and removes a duplicated xHCI helper.
+
 The OP13R 6.1.176 CI compile uses `make -k` and unlimited Clang error reporting
 to collect independent failures in one run. Errors still fail the build. No
 local kernel compilation or on-device validation is implied by patch checks.
+
+`validate_lts_merge.py COMMON_KERNEL_FOLDER` checks the known lifetime,
+interface and duplicate-definition regressions after the uprev patch sequence.
+CI runs it before the feature patches and compilation. It is deliberately a
+static regression guard, not a substitute for compiler or device validation.
 
 ## BORE
 

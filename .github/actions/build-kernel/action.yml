@@ -416,6 +416,7 @@ runs:
         F2FS_LOCK_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000e-android-6.1.176-f2fs-lock-context.patch"
         F2FS_TRACE_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000f-android-6.1.176-f2fs-trace-events.patch"
         INTEGRATION_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000g-android-6.1.176-integration-audit.patch"
+        FILE_OPS_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000h-android-6.1.176-file-operations.patch"
 
         echo "$UPREV_SHA256  $UPREV_PATCH" | sha256sum --check --strict
         xz --decompress --stdout "$UPREV_PATCH" > "$UPREV_RAW"
@@ -444,6 +445,11 @@ runs:
 
         patch --dry-run --batch --forward --fuzz=0 --silent -p1 < "$INTEGRATION_FIX_PATCH"
         patch --batch --forward --fuzz=0 --silent -p1 < "$INTEGRATION_FIX_PATCH"
+
+        patch --dry-run --batch --forward --fuzz=0 --silent -p1 < "$FILE_OPS_FIX_PATCH"
+        patch --batch --forward --fuzz=0 --silent -p1 < "$FILE_OPS_FIX_PATCH"
+
+        python3 "$GITHUB_WORKSPACE/action-source/patches/op13r/validate_lts_merge.py" "$COMMON_KERNEL_FOLDER"
 
         # Preserve the only executable file introduced by this upstream range.
         chmod 0755 tools/testing/selftests/ublk/test_stripe_04.sh

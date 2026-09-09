@@ -1069,6 +1069,8 @@ jobs:
           | **Optimization Level** | \`$OPTIMIZE_LEVEL\` |
           | **Clean Build** | $( [ "$CLEAN_BUILD" = "true" ] && echo "✅ Yes (no ccache)" || echo "❌ No (ccache enabled)" ) |
           | **Compiler** | \`Clang\` |
+          | **Source Branch** | \`OP13R-6.1.176v1\` |
+          | **Build Commit** | \`${{ github.sha }}\` |
           
           ---
           
@@ -1116,6 +1118,7 @@ jobs:
 
           - **Device:** OnePlus 13R only.
           - **Firmware:** OxygenOS 15 based on the pinned OnePlus 6.1.118 source.
+          - **Validation:** Built on GitHub Actions; not boot-tested on a physical OnePlus 13R. Vendor-module compatibility still requires device testing.
           - Back up the current boot image before flashing.
           - Flash the generated AnyKernel3 ZIP to the active slot and reboot.
           
@@ -1126,14 +1129,18 @@ jobs:
           ### This Release
           EOF
           echo "- Updated the Android 14 kernel LTS level from Linux 6.1.118 to 6.1.176." >> release_notes.md
+          echo "- Integrated Android LTS commit 2cee2416baae662580c7ce03bbe53d1c8f23d203 on the pinned OnePlus source." >> release_notes.md
+          echo "- Reconciled OnePlus CHP and Android MM extension lifetimes, restored vendor hooks and block CPU-hotplug registration." >> release_notes.md
+          echo "- Completed F2FS lock/trace interfaces, compressed writeback and reservation accounting, file-operation synchronization, and USB/PCI merge fixes." >> release_notes.md
+          echo "- Added static merge-regression checks before CI compilation." >> release_notes.md
           if jq -e 'any(.[]; .bore == true)' <<< "$JSON_BUILD_DATA" >/dev/null; then
-            echo "- Added BORE 5.3.0 scheduler for improved interactivity on OP13R." >> release_notes.md
+            echo "- Retained the BORE 5.3.0 scheduler from the base OP13R branch." >> release_notes.md
           fi
           if jq -e 'any(.[]; (.lz4kd == true) or (.lz4k == true))' <<< "$JSON_BUILD_DATA" >/dev/null; then
-            echo "- Added LZ4K/LZ4KD and selected LZ4K as the active OnePlus HybridSwap ZRAM compressor." >> release_notes.md
+            echo "- Retained LZ4K/LZ4KD with LZ4K selected as the OnePlus HybridSwap ZRAM compressor." >> release_notes.md
           fi
           if jq -e 'any(.[]; (.tcp_nodelay // false) == false and .model == "OP13r")' <<< "$JSON_BUILD_DATA" >/dev/null; then
-            echo "- Disabled forced TCP_NODELAY so applications retain control of their socket options." >> release_notes.md
+            echo "- Kept forced TCP_NODELAY disabled so applications retain control of their socket options." >> release_notes.md
           fi
           cat << EOF >> release_notes.md
           - SUSFS $SUSFS_BASE_VERSION with Maxsteel NoMount integration.
