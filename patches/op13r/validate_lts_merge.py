@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check known OP13R LTS merge invariants without compiling the kernel.
 
-Run against the common source tree after 0000a and 0000c-0000h. These checks
+Run against the common source tree after 0000a and 0000c-0000i. These checks
 guard prior merge regressions; they do not replace CI or on-device testing.
 """
 
@@ -74,6 +74,9 @@ def validate(root):
             "page array helpers now require sbi, not inode")
 
     file_ops = read("fs/f2fs/file.c")
+    donate = function(read("fs/f2fs/inode.c"), "f2fs_remove_donate_inode")
+    require("list_del_init(&F2FS_I(inode)->gdonate_list);" in donate and
+            "sbi->donate_files--;" in donate, "missing donation-cache inode cleanup implementation")
     require("f2fs_putname(buf);" in function(file_ops, "f2fs_trace_rw_file_path"),
             "trace path allocation/free mismatch")
     for name in ("f2fs_setattr", "f2fs_fallocate"):

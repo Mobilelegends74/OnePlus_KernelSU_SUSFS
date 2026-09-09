@@ -66,9 +66,14 @@ without counting internal OnePlus dedup recursion or failed-open cleanup.
 It also pairs trace-path allocations with `f2fs_putname`, exposes linear-lookup
 support and removes a duplicated xHCI helper.
 
+`0000i-android-6.1.176-donate-inode-lifetime.patch` restores the upstream
+donation-cache cleanup implementation used by eviction and last-close paths.
+
 The OP13R 6.1.176 CI compile uses `make -k` and unlimited Clang error reporting
 to collect independent failures in one run. Errors still fail the build. No
 local kernel compilation or on-device validation is implied by patch checks.
+Successful compiler outputs are cached even if another compilation unit or
+linking fails on this OP13R uprev, avoiding a full recompilation on every retry.
 
 `validate_lts_merge.py COMMON_KERNEL_FOLDER` checks the known lifetime,
 interface and duplicate-definition regressions after the uprev patch sequence.

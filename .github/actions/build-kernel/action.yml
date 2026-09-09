@@ -417,6 +417,7 @@ runs:
         F2FS_TRACE_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000f-android-6.1.176-f2fs-trace-events.patch"
         INTEGRATION_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000g-android-6.1.176-integration-audit.patch"
         FILE_OPS_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000h-android-6.1.176-file-operations.patch"
+        DONATE_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000i-android-6.1.176-donate-inode-lifetime.patch"
 
         echo "$UPREV_SHA256  $UPREV_PATCH" | sha256sum --check --strict
         xz --decompress --stdout "$UPREV_PATCH" > "$UPREV_RAW"
@@ -448,6 +449,9 @@ runs:
 
         patch --dry-run --batch --forward --fuzz=0 --silent -p1 < "$FILE_OPS_FIX_PATCH"
         patch --batch --forward --fuzz=0 --silent -p1 < "$FILE_OPS_FIX_PATCH"
+
+        patch --dry-run --batch --forward --fuzz=0 --silent -p1 < "$DONATE_FIX_PATCH"
+        patch --batch --forward --fuzz=0 --silent -p1 < "$DONATE_FIX_PATCH"
 
         python3 "$GITHUB_WORKSPACE/action-source/patches/op13r/validate_lts_merge.py" "$COMMON_KERNEL_FOLDER"
 
@@ -2822,13 +2826,23 @@ runs:
 
     - name: 📥 Checkout Code
       uses: actions/checkout@v6
-      if: always() && steps.build_kernel_step.conclusion == 'success'
+      if: |
+        always() && !cancelled() &&
+        (steps.build_kernel_step.conclusion == 'success' ||
+          (env.OP_MODEL == 'OP13r' && env.KERNEL_FULL_VER == 'android14-6.1.176' &&
+           steps.build_kernel_step.conclusion == 'failure'))
       with:
         path: main-source
         fetch-depth: 1
 
     - name: Save ccache cache
-      if: always() && steps.build_kernel_step.conclusion == 'success'
+      # ccache stores successful compiler outputs only. Retain those even when
+      # a different translation unit or the linker fails during this uprev.
+      if: |
+        always() && !cancelled() &&
+        (steps.build_kernel_step.conclusion == 'success' ||
+          (env.OP_MODEL == 'OP13r' && env.KERNEL_FULL_VER == 'android14-6.1.176' &&
+           steps.build_kernel_step.conclusion == 'failure'))
       uses: ./action-source/.github/actions/cache/save
       with:
         cache_path: ${{ env.CCACHE_DIR }}
