@@ -853,7 +853,7 @@ jobs:
       REPO_NAME: ${{ github.event.repository.name }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       SUSFS_BASE_VERSION: ${{ needs.set-op-model.outputs.susfs_base_version }}
-      RELEASE_NAME: 'OP13R-6.1.176v1'
+      RELEASE_NAME: 'OP13R-6.1.176v1 CWB-test1'
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v6
@@ -929,10 +929,11 @@ jobs:
           CLEAN_BUILD="${{ inputs.clean_build }}"
           
           cat << EOF > release_notes.md
-          # OP13R 6.1.176 v1
+          # OP13R 6.1.176 v1 — CWB test 1
           
           > **Build Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')  
           > **Build ID:** \`${{ github.run_id }}\`  
+          > **Status:** Experimental device-test build; not a stable release.<br>
           > **Workflow:** [\`${{ github.workflow }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           
           ---
@@ -1118,7 +1119,9 @@ jobs:
 
           - **Device:** OnePlus 13R only.
           - **Firmware:** OxygenOS 15 based on the pinned OnePlus 6.1.118 source.
-          - **Validation:** Built on GitHub Actions; not boot-tested on a physical OnePlus 13R. Vendor-module compatibility still requires device testing.
+          - **Validation:** The preceding 6.1.176 build booted on a OnePlus 13R, but screen flickering and instability were reported. This revised CWB build still requires a new device test.
+          - **Display fix scope:** Targeted legacy DSI/CWB compatibility with the OEM msm_drm module. Other clone and vendor atomic checks remain enabled. Resolution of flickering is not yet verified on hardware.
+          - **Known limitation:** A supplied process dump shows an ART/vmtools failure in system_server and a subsequent camera-provider Binder-death abort. This kernel patch does not claim to fix that userspace failure or the separate unrecorded random reboot.
           - Back up the current boot image before flashing.
           - Flash the generated AnyKernel3 ZIP to the active slot and reboot.
           
@@ -1128,6 +1131,9 @@ jobs:
           
           ### This Release
           EOF
+          echo "- Added narrowly scoped legacy DSI/CWB clone compatibility for the OnePlus msm_drm module; retained upstream validation for other topologies and explicit clone masks." >> release_notes.md
+          echo "- Added a one-time OP13R DRM compatibility marker and rate-limited clone-rejection diagnostics in dmesg." >> release_notes.md
+          echo "- Added CI host regression tests of the actual patched clone-policy functions, including rejected non-OEM and non-CWB configurations." >> release_notes.md
           echo "- Updated the Android 14 kernel LTS level from Linux 6.1.118 to 6.1.176." >> release_notes.md
           echo "- Integrated Android LTS commit 2cee2416baae662580c7ce03bbe53d1c8f23d203 on the pinned OnePlus source." >> release_notes.md
           echo "- Reconciled OnePlus CHP and Android MM extension lifetimes, restored vendor hooks and block CPU-hotplug registration." >> release_notes.md
@@ -1170,7 +1176,7 @@ jobs:
             --repo "${{ env.REPO_OWNER }}/${{ env.REPO_NAME }}" \
             --title "${{ env.RELEASE_NAME }}" \
             --notes-file release_notes.md \
-            --draft
+            --draft --prerelease
 
       - name: 📤 Upload Release Assets Dynamically
         run: |

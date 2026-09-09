@@ -69,6 +69,40 @@ support and removes a duplicated xHCI helper.
 `0000i-android-6.1.176-donate-inode-lifetime.patch` restores the upstream
 donation-cache cleanup implementation used by eviction and last-close paths.
 
+`0000j-android-6.1.176-msm-cwb-compat.patch` addresses a legacy OEM display
+integration gap exposed by the new upstream clone validation. The vendor
+`msm_drm` driver supports concurrent writeback through a virtual connector
+without populating clone masks beyond DRM's self-only defaults. Permit that
+specific topology only: exactly two encoders with self-only masks, exactly
+one DSI and one virtual connector on the same CRTC, and driver `msm_drm`.
+Other drivers, physical-output combinations and explicit clone masks retain
+the upstream checks; all vendor atomic/resource validation still runs.
+A one-time `OP13R DRM: legacy DSI/CWB clone compatibility enabled` marker
+allows device logs to confirm whether the compatibility path was reached.
+Remaining clone rejections on the OEM driver have rate-limited diagnostics.
+
+Device status: the preceding 6.1.176 build booted, but a user recorded repeated
+DRM atomic-commit `EINVAL` errors, invalid present fences and CWB read failures.
+This patch targets the source-level incompatibility; successful compilation
+or host tests do not establish that it resolves the recorded flickering.
+The supplied process dumps also show an ART/vmtools failure in `system_server`
+followed by a camera-provider Binder-death abort. Those userspace failures and
+a separate unrecorded random reboot are not claimed fixed by this patch.
+Release output remains an experimental draft prerelease pending device tests.
+Private device logs and tombstones are not included in this repository.
+
+OEM reference sources at revision `59872c8f37e6cd860a8df93fc44de8871f50ed44`:
+[display initialization](https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8650/blob/59872c8f37e6cd860a8df93fc44de8871f50ed44/vendor/qcom/opensource/display-drivers/msm/msm_drv.c),
+[SDE atomic checks](https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8650/blob/59872c8f37e6cd860a8df93fc44de8871f50ed44/vendor/qcom/opensource/display-drivers/msm/sde/sde_kms.c),
+[SDE encoder/CWB](https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8650/blob/59872c8f37e6cd860a8df93fc44de8871f50ed44/vendor/qcom/opensource/display-drivers/msm/sde/sde_encoder.c).
+
+`test_drm_cwb_compat.py COMMON_KERNEL_FOLDER` extracts the two actual patched
+C functions and tests them against mock DRM objects on the GitHub Actions
+host before the kernel build. Eighteen cases cover the legacy exception,
+non-OEM drivers, physical-only outputs, unrelated CRTCs, connector/encoder
+counts and explicit clone masks. Locally use `--check-source-only` to check
+extraction without compiling or executing C. This is not a panel or ABI test.
+
 The OP13R 6.1.176 CI compile uses `make -k` and unlimited Clang error reporting
 to collect independent failures in one run. Errors still fail the build. No
 local kernel compilation or on-device validation is implied by patch checks.

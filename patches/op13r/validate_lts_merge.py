@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check known OP13R LTS merge invariants without compiling the kernel.
 
-Run against the common source tree after 0000a and 0000c-0000i. These checks
+Run against the common source tree after 0000a and 0000c-0000j. These checks
 guard prior merge regressions; they do not replace CI or on-device testing.
 """
 
@@ -96,6 +96,24 @@ def validate(root):
     for name in ("android_vh_mm_init", "android_vh_mm_free", "android_rvh_create_worker",
                  "android_vh_drain_all_pages_bypass", "android_vh_signal_coredump_check"):
         require(exports.count(name) == 1, f"missing or duplicate vendor export: {name}")
+
+    drm = read("drivers/gpu/drm/drm_atomic_helper.c")
+    cwb = function(drm, "drm_atomic_legacy_msm_cwb")
+    for guard in ('strcmp(crtc->dev->driver->name, "msm_drm")',
+                  'hweight32(crtc_state->encoder_mask) != 2',
+                  'encoder->possible_clones != drm_encoder_mask(encoder)',
+                  'conn_state->crtc != crtc',
+                  'DRM_MODE_CONNECTOR_DSI', 'DRM_MODE_CONNECTOR_VIRTUAL',
+                  'return dsi == 1 && cwb == 1;'):
+        require(guard in cwb, f"missing legacy CWB restriction: {guard}")
+    clone_check = function(drm, "drm_atomic_check_valid_clones")
+    require('if (drm_atomic_legacy_msm_cwb(state, crtc))' in clone_check,
+            "missing targeted legacy CWB compatibility path")
+    require('return -EINVAL;' in clone_check and
+            'crtc_state->encoder_mask & drm_enc->possible_clones' in clone_check,
+            "upstream clone validation must remain in place")
+    require('OP13R DRM: legacy DSI/CWB clone compatibility enabled' in clone_check,
+            "missing one-time device diagnostic for CWB compatibility")
 
     for error in errors:
         print(f"ERROR: {error}", file=sys.stderr)
