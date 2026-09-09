@@ -2362,7 +2362,7 @@ runs:
         KCFLAGS="$KCFLAGS -Wno-error -pipe ${KCFLAGS_EXTRA}"
         KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
         MAKE_DIAGNOSTICS=()
-        if [ "$OP_MODEL" = "OP13r" ] && [ "$KERNEL_FULL_VER" = "6.1.176" ]; then
+        if [ "$OP_MODEL" = "OP13r" ] && [ "$KERNEL_FULL_VER" = "android14-6.1.176" ]; then
           # Report independent failures in one CI run, without masking errors.
           MAKE_DIAGNOSTICS=(-k)
           KCFLAGS="$KCFLAGS -ferror-limit=0"
