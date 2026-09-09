@@ -48,6 +48,21 @@ deduplication and extended-attribute paths to the lock-context API introduced
 by the newer F2FS code, and completes the new length-aware block invalidation
 calls.
 
+`0000f-android-6.1.176-f2fs-trace-events.patch` restores the lock timing and
+priority trace events used by the checkpoint code, retaining the OEM events.
+
+`0000g-android-6.1.176-integration-audit.patch` completes the MM, block, USB,
+PCI, vendor-hook and F2FS integration. Android's private MM extension shares
+KABI reserve 1 with the OEM CHP pointer: CHP is kept as the extension's first
+member, preserving its pointer layout, and allocation, duplication and all
+free paths own exactly one extension. The patch also restores compressed-page
+writeback accounting and raw-cluster locking while retaining OnePlus's fixed
+decompression arrays and fixed-output layout.
+
+The OP13R 6.1.176 CI compile uses `make -k` and unlimited Clang error reporting
+to collect independent failures in one run. Errors still fail the build. No
+local kernel compilation or on-device validation is implied by patch checks.
+
 ## BORE
 
 `0001-sched-bore-5.3.0-android14-6.1.patch` integrates the BORE 5.3.0 scheduler

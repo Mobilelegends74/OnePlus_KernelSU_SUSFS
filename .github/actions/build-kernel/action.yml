@@ -414,6 +414,8 @@ runs:
         VENDOR_HOOK_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000c-android-6.1.176-vendor-hooks.patch"
         F2FS_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000d-android-6.1.176-f2fs-merge-fixes.patch"
         F2FS_LOCK_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000e-android-6.1.176-f2fs-lock-context.patch"
+        F2FS_TRACE_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000f-android-6.1.176-f2fs-trace-events.patch"
+        INTEGRATION_FIX_PATCH="$GITHUB_WORKSPACE/action-source/patches/op13r/0000g-android-6.1.176-integration-audit.patch"
 
         echo "$UPREV_SHA256  $UPREV_PATCH" | sha256sum --check --strict
         xz --decompress --stdout "$UPREV_PATCH" > "$UPREV_RAW"
@@ -436,6 +438,12 @@ runs:
 
         patch --dry-run --batch --forward --fuzz=0 --silent -p1 < "$F2FS_LOCK_FIX_PATCH"
         patch --batch --forward --fuzz=0 --silent -p1 < "$F2FS_LOCK_FIX_PATCH"
+
+        patch --dry-run --batch --forward --fuzz=0 --silent -p1 < "$F2FS_TRACE_FIX_PATCH"
+        patch --batch --forward --fuzz=0 --silent -p1 < "$F2FS_TRACE_FIX_PATCH"
+
+        patch --dry-run --batch --forward --fuzz=0 --silent -p1 < "$INTEGRATION_FIX_PATCH"
+        patch --batch --forward --fuzz=0 --silent -p1 < "$INTEGRATION_FIX_PATCH"
 
         # Preserve the only executable file introduced by this upstream range.
         chmod 0755 tools/testing/selftests/ublk/test_stripe_04.sh
@@ -2353,6 +2361,12 @@ runs:
         
         KCFLAGS="$KCFLAGS -Wno-error -pipe ${KCFLAGS_EXTRA}"
         KCPPFLAGS="$KCPPFLAGS -DCONFIG_OPTIMIZE_INLINING"
+        MAKE_DIAGNOSTICS=()
+        if [ "$OP_MODEL" = "OP13r" ] && [ "$KERNEL_FULL_VER" = "6.1.176" ]; then
+          # Report independent failures in one CI run, without masking errors.
+          MAKE_DIAGNOSTICS=(-k)
+          KCFLAGS="$KCFLAGS -ferror-limit=0"
+        fi
         
         echo "============================================"
         echo "🔧 Build Configuration"
@@ -2388,7 +2402,7 @@ runs:
         set -o pipefail
         
         if [ "${{ inputs.debug }}" == "true" ]; then
-          make V=1 LD="$COMMON_KERNEL_FOLDER/ld-wrapper" HOSTLD="$COMMON_KERNEL_FOLDER/ld-wrapper" -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" CONFIG_FAKE_DISABLE="$CONFIG_FAKE_DISABLE" Image modules 2>&1 | tee build.log
+          make "${MAKE_DIAGNOSTICS[@]}" V=1 LD="$COMMON_KERNEL_FOLDER/ld-wrapper" HOSTLD="$COMMON_KERNEL_FOLDER/ld-wrapper" -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" CONFIG_FAKE_DISABLE="$CONFIG_FAKE_DISABLE" Image modules 2>&1 | tee build.log
           make V=1 LD="$COMMON_KERNEL_FOLDER/ld-wrapper" HOSTLD="$COMMON_KERNEL_FOLDER/ld-wrapper" -j"$(nproc --all)" O="$COMMON_KERNEL_FOLDER/out" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" CONFIG_FAKE_DISABLE="$CONFIG_FAKE_DISABLE" INSTALL_MOD_PATH="$COMMON_KERNEL_FOLDER/out/install" modules_install 2>&1 | tee install.log
           
           cp build.log "$DEBUG_ARTIFACTS_FOLDER/build.log"
@@ -2400,7 +2414,7 @@ runs:
           
           ls -la "$DEBUG_ARTIFACTS_FOLDER"
         else
-          make LD="$COMMON_KERNEL_FOLDER/ld-wrapper" HOSTLD="$COMMON_KERNEL_FOLDER/ld-wrapper" -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" CONFIG_FAKE_DISABLE="$CONFIG_FAKE_DISABLE" Image 2>&1 | tee build.log
+          make "${MAKE_DIAGNOSTICS[@]}" LD="$COMMON_KERNEL_FOLDER/ld-wrapper" HOSTLD="$COMMON_KERNEL_FOLDER/ld-wrapper" -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" CONFIG_FAKE_DISABLE="$CONFIG_FAKE_DISABLE" Image 2>&1 | tee build.log
         fi
         
         BUILD_END=$(date +%s)
