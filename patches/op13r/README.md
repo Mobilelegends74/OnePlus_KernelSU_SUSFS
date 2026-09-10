@@ -90,6 +90,9 @@ followed by a camera-provider Binder-death abort. Those userspace failures and
 a separate unrecorded random reboot are not claimed fixed by this patch.
 Release output remains an experimental draft prerelease pending device tests.
 Private device logs and tombstones are not included in this repository.
+The workflow also verifies that KernelSU Next's installer checked out the exact
+resolved revision: its upstream script can otherwise report success after a
+failed checkout and silently remain on the default branch.
 
 OEM reference sources at revision `59872c8f37e6cd860a8df93fc44de8871f50ed44`:
 [display initialization](https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8650/blob/59872c8f37e6cd860a8df93fc44de8871f50ed44/vendor/qcom/opensource/display-drivers/msm/msm_drv.c),

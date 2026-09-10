@@ -1033,10 +1033,13 @@ runs:
 
         cd KernelSU-Next
 
-        # setup.sh checks out the resolved SHA in detached HEAD.
-        # Reattach the exact SHA as dev-susfs so pershoot Kbuild
-        # calculates the real version against origin/dev.
+        # Upstream setup.sh currently hides a failed checkout behind a successful
+        # fallback to its default branch. Never compile that unintended revision.
         RESOLVED_KSU_SHA=$(git rev-parse HEAD)
+        if [ "$RESOLVED_KSU_SHA" != "$KSU_INPUT" ]; then
+          echo "::error::KernelSU Next revision mismatch: requested $KSU_INPUT, got $RESOLVED_KSU_SHA"
+          exit 1
+        fi
 
         if [ -f .git/shallow ]; then
           git fetch --unshallow origin --quiet
