@@ -892,17 +892,27 @@ runs:
           echo "SUSFS_COMMIT_SHA=$SUSFS_BRANCH" >> $GITHUB_ENV
 
           if [ "${{ inputs.ksu_type }}" = "KSUN" ]; then
-            echo "Applying pershoot SUSFS compatibility patches..."
+            echo "Checking pershoot SUSFS compatibility patches..."
 
             cd "$SUSFS_FOLDER"
 
-            patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0001-pershoot-Allow-core-to-be-built-with-no-features.patch"
+            if [ -f "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0001-pershoot-Allow-core-to-be-built-with-no-features.patch" ]; then
+              echo "Applying pershoot patch 0001"
+              patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0001-pershoot-Allow-core-to-be-built-with-no-features.patch"
+            else
+              echo "Skipping missing pershoot patch 0001"
+            fi
 
-            patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0002-pershoot-Implement-SuSFS-and-Toolkit-coexistence.patch"
+            if [ -f "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0002-pershoot-Implement-SuSFS-and-Toolkit-coexistence.patch" ]; then
+              echo "Applying pershoot patch 0002"
+              patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0002-pershoot-Implement-SuSFS-and-Toolkit-coexistence.patch"
+            else
+              echo "Skipping missing pershoot patch 0002"
+            fi
 
             cd "$GITHUB_WORKSPACE"
 
-            echo "✅ pershoot SUSFS compatibility patches applied"
+            echo "SUSFS compatibility patch stage completed"
           fi
         fi
         echo "✅ Dependencies cloned"
