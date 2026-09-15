@@ -1693,7 +1693,36 @@ runs:
         fi
 
         echo "::endgroup::"
+    - name: Apply vpnhide builtin
+      shell: bash
+      if: ${{ env.OP_VPNHIDE == 'true' && env.OP_MODEL == 'OP13r' && env.KERNEL_VER == '6.1' }}
+      run: |
+        set -euo pipefail
+        echo "::group::Apply vpnhide builtin"
 
+        VPH_SRC="$GITHUB_WORKSPACE/vpnhide"
+
+        git clone \
+          --depth 1 \
+          --single-branch \
+          --branch builtin-python-integration \
+          https://github.com/okhsunrog/vpnhide.git \
+          "$VPH_SRC"
+
+        python3 "$VPH_SRC/builtin/scripts/integrate.py" \
+          export \
+          --kernel "$COMMON_KERNEL_FOLDER" \
+          --kmi android14-6.1 \
+          --output "$GITHUB_WORKSPACE/vpnhide-review"
+
+          cd "$COMMON_KERNEL_FOLDER"
+
+        patch -p1 --forward < "$GITHUB_WORKSPACE/vpnhide-review/vpnhide.patch"
+
+        scripts/config --file "$COMMON_KERNEL_FOLDER/arch/arm64/configs/gki_defconfig" -e VPNHIDE
+
+        echo "✅ vpnhide builtin integrated"
+        echo "::endgroup::"
     - name: Apply NTSync Patch
       shell: bash
       if: ${{ env.OP_NTSYNC == 'true' }}

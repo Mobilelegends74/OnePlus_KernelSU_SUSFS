@@ -20,6 +20,7 @@
   "bore": true,
   "lz4kd": true,
   "lz4k": true,
+  "vpnhide": true,
   "ds": true,
   "bbg": true,
   "bbr": true,
