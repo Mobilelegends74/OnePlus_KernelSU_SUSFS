@@ -797,59 +797,54 @@ runs:
           local branch="${2:-main}"
           local max_attempts=3
           local attempt=1
-          
+
           local repo_name=$(basename "$url" .git)
           local safe_branch=$(echo "$branch" | tr '/' '_')
           local archive_name="${repo_name}_${safe_branch}.tar.gz"
           local shm_path="/dev/shm/$archive_name"
-          
+
           local nproc=$(nproc 2>/dev/null || echo 4)
-          
-          local aria_log_flags="--quiet --summary-interval=0"
-          if [ "${{ inputs.debug }}" = "true" ]; then
-              aria_log_flags="--summary-interval=5" # Show progress every 5s in debug
-          fi
-          
-          local aria2_headers=(
-            "--header=User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            "--header=Accept: */*"
-            "--header=Connection: keep-alive"
-          )
-          
-          local download_url=""
-          if [[ "$url" == *"github.com"* ]]; then
-              download_url="${url%.git}/archive/refs/heads/${branch}.tar.gz"
-          elif [[ "$url" == *"gitlab.com"* ]]; then
-              download_url="${url%.git}/-/archive/${branch}/${repo_name}-${branch}.tar.gz"
-          else
-              echo "::error::Unsupported host: $url"
-              return 1
-          fi
-          
+
           while [ $attempt -le $max_attempts ]; do
-              echo " Attempt $attempt/$max_attempts: High-speed fetch for $repo_name ($branch)"
-              
-              if curl -L \
-                  --fail \
-                  --retry 5 \
-                  --retry-delay 2 \
-                  -A "Mozilla/5.0" \
-                  -o "$shm_path" \
-                  "$download_url"; then
-                  mkdir -p "$repo_name"
-                  if tar -I "pigz -p $nproc -b 256" -x --record-size=1M -f "$shm_path" -C "$repo_name" --strip-components=1 --no-same-owner; then
+              echo " Attempt $attempt/$max_attempts: Fetching $repo_name ($branch)"
+
+              rm -rf "$repo_name" "$shm_path" 2>/dev/null
+
+              # Try git clone (works with branches and commits)
+              if git clone \
+                  --depth 1 \
+                  "$url" \
+                  "$repo_name"; then
+
+                  cd "$repo_name"
+
+                  if git checkout "$branch" 2>/dev/null; then
+                      cd ..
+
                       echo "✅ Success: $repo_name synced"
-                      rm -f "$shm_path"
                       return 0
                   fi
+
+                  # Fetch commit SHA if it is not included in shallow clone
+                  git fetch --depth 1 origin "$branch" 2>/dev/null || true
+
+                  if git checkout "$branch" 2>/dev/null; then
+                      cd ..
+
+                      echo "✅ Success: $repo_name synced"
+                      return 0
+                  fi
+
+                  cd ..
               fi
-              
-              echo "⚠️ Attempt $attempt failed, clearing RAM and retrying..."
-              rm -rf "$repo_name" "$shm_path" 2>/dev/null
+
+              echo "⚠️ Git clone failed, retrying..."
+              rm -rf "$repo_name"
+
               sleep 5
               attempt=$((attempt + 1))
           done
-          
+
           echo "::error::All attempts failed for $url"
           return 1
         }
