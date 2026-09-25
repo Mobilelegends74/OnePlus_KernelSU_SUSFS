@@ -1706,9 +1706,12 @@ runs:
         git clone \
           --depth 1 \
           --single-branch \
-          --branch builtin-python-integration \
+          --branch main \
           https://github.com/okhsunrog/vpnhide.git \
           "$VPH_SRC"
+
+        VPNHIDE_COMMIT_SHA="$(git -C "$VPH_SRC" rev-parse HEAD)"
+        echo "VPNHIDE_COMMIT_SHA=$VPNHIDE_COMMIT_SHA" >> "$GITHUB_ENV"
 
         python3 "$VPH_SRC/builtin/scripts/integrate.py" \
           export \
@@ -2657,6 +2660,7 @@ runs:
           echo "| **Model** | ${{ env.OP_MODEL }} |"
           echo "| **OS Version** | ${{ env.OP_OS_VERSION }} |"
           echo "| **Kernel Version** | ${{ steps.save_metadata.outputs.kernel_version }} |"
+          echo "| **Workflow Commit** | [\`${GITHUB_SHA:0:8}\`](https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}) |"
           echo "| **Kernel Uname** | \`${{ env.KERNEL_UNAME }}\` |"
           echo "| **Build User** | ${{ env.BUILD_USER }} |"
           echo "| **Build Host** | ${{ env.BUILD_HOST }} |"
@@ -2683,6 +2687,13 @@ runs:
               echo "| **SUSFS Commit** | [\`${SUSFS_SHA:0:8}\`](https://gitlab.com/simonpunk/susfs4ksu/-/commit/$SUSFS_SHA) |"
             else
               echo "| **SUSFS Commit** | unknown |"
+            fi
+          fi
+
+          if [ "${{ env.OP_VPNHIDE }}" = true ]; then
+            echo "| **VPNHide Built-in** | enabled (OP13R / Android 14 / 6.1) |"
+            if [ -n "${VPNHIDE_COMMIT_SHA:-}" ]; then
+              echo "| **VPNHide Commit** | [\`${VPNHIDE_COMMIT_SHA:0:8}\`](https://github.com/okhsunrog/vpnhide/commit/$VPNHIDE_COMMIT_SHA) |"
             fi
           fi
           

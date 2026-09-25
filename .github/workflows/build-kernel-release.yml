@@ -762,6 +762,7 @@ jobs:
           ### ${{ matrix.model }} (${{ matrix.os_version }}) - ${{ job.status == 'success' && '✅ Success' || '❌ Failed' }}
           
           **Kernel:** ${{ matrix.android_version }}-${{ matrix.kernel_version }}
+          **Workflow Commit:** [\`${GITHUB_SHA:0:8}\`](https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA})
           EOF
           
           if [ "${{ matrix.susfs }}" = true ]; then
@@ -1023,6 +1024,9 @@ jobs:
             echo "::error::No device info found!" >&2
             exit 1
           fi
+
+          VPNHIDE_COMMIT="$(git ls-remote https://github.com/okhsunrog/vpnhide.git refs/heads/main | awk '{print $1}')"
+          [ -n "$VPNHIDE_COMMIT" ] || VPNHIDE_COMMIT="main"
           
           cat << EOF >> release_notes.md
           
@@ -1069,6 +1073,8 @@ jobs:
           | **Optimization Level** | \`$OPTIMIZE_LEVEL\` |
           | **Clean Build** | $( [ "$CLEAN_BUILD" = "true" ] && echo "✅ Yes (no ccache)" || echo "❌ No (ccache enabled)" ) |
           | **Compiler** | \`Clang\` |
+          | **VPNHide Built-in** | Enabled for OP13R (Android 14 / Linux 6.1) |
+          | **VPNHide Commit** | [\`${VPNHIDE_COMMIT:0:8}\`](https://github.com/okhsunrog/vpnhide/commit/$VPNHIDE_COMMIT) |
           
           ---
           
@@ -1090,6 +1096,7 @@ jobs:
           - **Maxsteel NoMount**
           - **Baseband Guard (BBG)**
           - **Unicode bypass fix**
+          - **VPNHide Built-in** for OP13R (Android 14 / Linux 6.1)
 
           ### Performance and memory
           - **BORE 5.3.0 scheduler**
