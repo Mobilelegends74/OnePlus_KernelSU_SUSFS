@@ -1075,6 +1075,7 @@ jobs:
           | **Compiler** | \`Clang\` |
           | **VPNHide Built-in** | Enabled for OP13R (Android 14 / Linux 6.1) |
           | **VPNHide Commit** | [\`${VPNHIDE_COMMIT:0:8}\`](https://github.com/okhsunrog/vpnhide/commit/$VPNHIDE_COMMIT) |
+          | **NoMount Commit** | [\`${NOMOUNT_COMMIT:0:8}\`](https://github.com/maxsteeel/nomount/commit/$NOMOUNT_COMMIT) |
           
           ---
           
