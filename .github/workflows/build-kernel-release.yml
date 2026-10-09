@@ -1027,6 +1027,8 @@ jobs:
 
           VPNHIDE_COMMIT="$(git ls-remote https://github.com/okhsunrog/vpnhide.git refs/heads/main | awk '{print $1}')"
           [ -n "$VPNHIDE_COMMIT" ] || VPNHIDE_COMMIT="main"
+          NOMOUNT_COMMIT="$(git ls-remote https://github.com/maxsteeel/nomount.git refs/heads/dev | awk '{print $1}')"
+          [ -n "$NOMOUNT_COMMIT" ] || NOMOUNT_COMMIT="dev"
           
           cat << EOF >> release_notes.md
           
