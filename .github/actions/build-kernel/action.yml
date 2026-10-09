@@ -838,6 +838,23 @@ runs:
                   cd ..
               fi
 
+              # GitLab can temporarily reject git transport while its archive
+              # endpoint remains available. Use the same ref through the
+              # archive endpoint before retrying the clone.
+              if [[ "$url" == *"gitlab.com"* ]]; then
+                  archive_url="${url%.git}/-/archive/${branch}/${repo_name}-${branch//\//_}.tar.gz"
+                  archive_file="/dev/shm/${repo_name}_${safe_branch}.fallback.tar.gz"
+                  echo "Trying GitLab archive fallback: $archive_url"
+                  if curl -fL --retry 3 --retry-delay 2 "$archive_url" -o "$archive_file"; then
+                      extracted_dir="${repo_name}-${branch//\//_}"
+                      if tar -xzf "$archive_file" && [ -d "$extracted_dir" ]; then
+                          mv "$extracted_dir" "$repo_name"
+                          echo "✅ Success: $repo_name archive synced"
+                          return 0
+                      fi
+                  fi
+              fi
+
               echo "⚠️ Git clone failed, retrying..."
               rm -rf "$repo_name"
 
