@@ -908,9 +908,18 @@ runs:
 
             cd "$SUSFS_FOLDER"
 
-            patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0001-pershoot-Allow-core-to-be-built-with-no-features.patch"
-
-            patch -p1 --forward < "$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0002-pershoot-Implement-SuSFS-and-Toolkit-coexistence.patch"
+            patch_0001="$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0001-pershoot-Allow-core-to-be-built-with-no-features.patch"
+            patch_0002="$KERNEL_PATCHES_FOLDER/pershoot/susfs4ksu/0002-pershoot-Implement-SuSFS-and-Toolkit-coexistence.patch"
+            if [ -f "$patch_0001" ]; then
+              patch -p1 --forward < "$patch_0001"
+            else
+              echo "ℹ️ pershoot compatibility patch 0001 is not present in current kernel_patches; skipping"
+            fi
+            if [ -f "$patch_0002" ]; then
+              patch -p1 --forward < "$patch_0002"
+            else
+              echo "ℹ️ pershoot compatibility patch 0002 is not present in current kernel_patches; skipping"
+            fi
 
             cd "$GITHUB_WORKSPACE"
 
