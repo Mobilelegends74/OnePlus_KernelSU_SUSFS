@@ -837,6 +837,18 @@ runs:
                       return 0
                   fi
               fi
+
+              if [[ "$url" == *"gitlab.com"* ]]; then
+                  echo "Trying curl fallback for SUSFS archive"
+                  if curl -fL --retry 3 --retry-delay 2 "$download_url" -o "$shm_path"; then
+                      mkdir -p "$repo_name"
+                      if tar -xzf "$shm_path" -C "$repo_name" --strip-components=1 --no-same-owner; then
+                          echo "✅ Success: $repo_name synced through curl archive"
+                          rm -f "$shm_path"
+                          return 0
+                      fi
+                  fi
+              fi
               
               echo "⚠️ Attempt $attempt failed, clearing RAM and retrying..."
               rm -rf "$repo_name" "$shm_path" 2>/dev/null
