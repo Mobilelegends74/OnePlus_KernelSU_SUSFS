@@ -1183,6 +1183,12 @@ jobs:
             fi
           done
 
+      - name: Publish release after asset upload
+        run: |
+          gh release edit "${{ env.NEW_TAG }}" \
+            --repo "${{ env.REPO_OWNER }}/${{ env.REPO_NAME }}" \
+            --draft=false --latest
+
       - name: 📊 Release summary
         if: success()
         run: |
