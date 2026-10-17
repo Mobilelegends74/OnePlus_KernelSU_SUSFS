@@ -855,21 +855,10 @@ jobs:
 
       - name: 🏷️ Generate and Create New Tag
         run: |
-          # Only search for tags starting with this SUSFS version
-          LATEST_MATCHING_TAG=$(gh api repos/$REPO_OWNER/$REPO_NAME/tags \
-            --jq "[.[] | select(.name | startswith(\"${SUSFS_BASE_VERSION}-r\"))] \
-                  | sort_by(.name | split(\"-r\")[1] | tonumber) \
-                  | last | .name // empty")
-          
-          if [ -z "$LATEST_MATCHING_TAG" ]; then
-            # No existing release for this version SUSFS → first release
-            NEW_TAG="${SUSFS_BASE_VERSION}-r1"
-          else
-            # Only increment the -r* suffix of the latest release for this version
-            NEW_TAG=$(echo "$LATEST_MATCHING_TAG" | awk -F'-r' '{printf "%s-r%d", $1, $2+1}')
-          fi
-          
-          echo "New tag: $NEW_TAG"
+          RELEASE_DATE=$(date -u '+%Y-%m-%d')
+          NEW_TAG="opace5-6.1.141-${RELEASE_DATE}-build${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          RELEASE_NAME="OnePlus Ace 5 | Linux 6.1.141 | NoMount v2.1.1 stable | ${RELEASE_DATE} | Build ${GITHUB_RUN_NUMBER}"
+          echo "RELEASE_NAME=${RELEASE_NAME}" >> "$GITHUB_ENV"
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
           git tag $NEW_TAG
           git push origin $NEW_TAG
@@ -922,7 +911,7 @@ jobs:
           CLEAN_BUILD="${{ inputs.clean_build }}"
           
           cat << EOF > release_notes.md
-          # OnePlus Ace 5 6.1.141 v1
+          # ${RELEASE_NAME}
           
           > **Build Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')  
           > **Build ID:** \`${{ github.run_id }}\`  
@@ -1062,6 +1051,8 @@ jobs:
           | **Optimization Level** | \`$OPTIMIZE_LEVEL\` |
           | **Clean Build** | $( [ "$CLEAN_BUILD" = "true" ] && echo "✅ Yes (no ccache)" || echo "❌ No (ccache enabled)" ) |
           | **Compiler** | \`Clang\` |
+          | **NoMount Release** | [v2.1.1 stable](https://github.com/maxsteeel/nomount/releases/tag/v2.1.1) |
+          | **NoMount Commit** | [7046c7ad](https://github.com/maxsteeel/nomount/commit/7046c7ad3ee0bf4ae66e80f6b93b1e30db0cb4e3) |
           
           ---
           
@@ -1117,6 +1108,8 @@ jobs:
           ## Changes in OnePlus-Ace5-6.1.141v1
           
           ### This Release
+          - NoMount kernel source pinned to stable v2.1.1 instead of dev.
+          - Device compatibility still requires testing on OnePlus Ace 5; OP13R testing does not validate this device.
           EOF
           if jq -e 'any(.[]; .bore == true)' <<< "$JSON_BUILD_DATA" >/dev/null; then
             echo "- Added BORE 5.3.0 scheduler for improved interactivity on OnePlus Ace 5." >> release_notes.md
@@ -1167,7 +1160,7 @@ jobs:
           done
 
       - name: 📢 Publish GitHub Release
-        run: gh release edit "${{ env.NEW_TAG }}" --draft=false
+        run: gh release edit "${{ env.NEW_TAG }}" --draft=false --latest
 
       - name: 📊 Release summary
         if: success()
