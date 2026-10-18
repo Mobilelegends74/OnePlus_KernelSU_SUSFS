@@ -5,6 +5,12 @@ permissions:
   actions: write
 
 on:
+  push:
+    branches: [UIDFAKE-op13r-6.1.118-build80]
+    paths:
+      - '.github/actions/build-kernel/action.yml'
+      - '.github/workflows/build-kernel-release.yml'
+      - 'scripts/uidfake-*'
   workflow_dispatch:
     inputs:
       make_release:
@@ -112,8 +118,8 @@ jobs:
           set -euo pipefail
           echo "::group::Matrix generation"
           
-          input="${{ github.event.inputs.op_model }}"
-          ksu_options_raw='${{ github.event.inputs.ksu_options }}'
+          input="${{ github.event.inputs.op_model || 'A15' }}"
+          ksu_options_raw='${{ github.event.inputs.ksu_options || '[{"type":"ksun","hash":"66fe35ecf872f60dcd033bebc308e8e2820ffc74"}]' }}'
           if ! ksu_options_normalized=$(echo "$ksu_options_raw" | jq -c 'map(if .type then .type |= ascii_upcase | if .hash == null then if .type == "KSUN" then .hash = "dev-susfs" elif .type == "KSU" then .hash = "main" else .hash end else . end else error("No type found") end)' 2>&1); then
             echo "::error::ksu_options validation failed: $ksu_options_normalized"
             exit 1
@@ -698,9 +704,9 @@ jobs:
           ksu_type: ${{ matrix.ksu_type }}
           ksu_branch_or_hash: ${{ matrix.ksu_resolved_hash }}
           susfs_commit_hash_or_branch: ${{ matrix.susfs_resolved_hash }}
-          optimize_level: ${{ inputs.optimize_level }}
+          optimize_level: ${{ inputs.optimize_level || 'O2' }}
           build_timestamp: ${{ inputs.build_timestamp }}
-          clean: ${{ inputs.clean_build }}
+          clean: ${{ inputs.clean_build || 'false' }}
           debug: ${{ inputs.debug }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
