@@ -29,7 +29,7 @@ EOF
 cat > "$dest/Kconfig" <<'EOF'
 config HMA_UIDFAKE_BUILTIN
     bool "HMA UID Fake built into kernel"
-    depends on ARM64 && KPROBES && NET && NETLINK
+    depends on ARM64 && KPROBES && NET
     help
       In-kernel UID-visibility policy engine. A userspace sync service
       supplies HMA/HMA-OSS policy using the existing kaux netlink protocol.
