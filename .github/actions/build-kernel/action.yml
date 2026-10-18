@@ -2124,6 +2124,15 @@ runs:
           patch -p1 < "$KERNEL_PATCHES_FOLDER/common/vendor_modules/0001-Support-conditional-vendor-modules-blacklisting-6.1-and-above.patch"
         fi
         
+    - name: Integrate UIDFAKE into in-tree kernel sources
+      shell: bash
+      if: ${{ github.ref_name == 'UIDFAKE-op13r-6.1.118-build80' && env.OP_MODEL == 'OP13r' }}
+      run: |
+        set -euo pipefail
+        bash "$GITHUB_WORKSPACE/scripts/uidfake-integrate-kernel.sh" "$COMMON_KERNEL_FOLDER"
+        test -f "$COMMON_KERNEL_FOLDER/drivers/misc/hma_uidfake/hooks.c"
+        echo "UIDFAKE built-in sources installed"
+
     - name: Build Kernel
       id: build_kernel_step
       shell: bash
@@ -2254,6 +2263,14 @@ runs:
         
         
         make LD="$COMMON_KERNEL_FOLDER/ld-wrapper" HOSTLD="$COMMON_KERNEL_FOLDER/ld-wrapper" O="$OUT" olddefconfig
+
+        if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+          grep -qx 'CONFIG_HMA_UIDFAKE_BUILTIN=y' "$OUT/.config" || {
+            echo "::error::UIDFAKE not enabled by final Kconfig"; exit 1;
+          }
+          echo "UIDFAKE built-in Kconfig enabled"
+        fi
+
 
         if [ "${OP_BORE:-false}" = "true" ]; then
           grep -qx 'CONFIG_SCHED_BORE=y' "$OUT/.config" || {
@@ -2562,6 +2579,11 @@ runs:
         fi
         
         cp "$IMAGE_PATH" "$AK3_FOLDER/Image"
+
+        if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+          bash "$GITHUB_WORKSPACE/scripts/uidfake-stage-anykernel.sh" "$AK3_FOLDER"
+        fi
+
         
         mv "${ARTIFACTS_FOLDER}/${OP_MODEL}_${OP_OS_VERSION}.txt" "$AK3_FOLDER/"
         cd "$AK3_FOLDER"
@@ -2580,6 +2602,9 @@ runs:
           ZIP_NAME="AK3_${ZIP_MODEL}_${OP_OS_VERSION}_${KERNEL_FULL_VER}_${{ inputs.ksu_type }}_${KSUVER:-unknown}_SuSFS_${SUSVER:-unknown}.zip"
         else
           ZIP_NAME="AK3_${ZIP_MODEL}_${OP_OS_VERSION}_${KERNEL_FULL_VER}_${{ inputs.ksu_type }}_${KSUVER:-unknown}.zip"
+        fi
+        if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+          ZIP_NAME="${ZIP_NAME%.zip}_UIDFAKE.zip"
         fi
         mkdir -p "$ARTIFACTS_FOLDER"
         
