@@ -80,17 +80,27 @@
  	if (error)
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
-@@ -1582,6 +1582,10 @@
- 	 *
- 	 * Do not put anything below here!
+@@ -1565,12 +1565,20 @@
+ 	ANDROID_KABI_RESERVE(5);
+ 	ANDROID_KABI_RESERVE(6);
+ 	ANDROID_KABI_RESERVE(7);
++	/* UIDFAKE identity: native KABI reservation */
++#if defined(CONFIG_HMA_UIDFAKE_BUILTIN) && defined(CONFIG_ANDROID_KABI_RESERVE)
++	ANDROID_KABI_USE(8, u32 hma_uidfake_app);
++#else
+ 	ANDROID_KABI_RESERVE(8);
++#endif
+ 
+ 	/*
+ 	 * New fields for task_struct should be added above here, so that
+ 	 * they are included in the randomized portion of task_struct.
  	 */
-+#ifdef CONFIG_HMA_UIDFAKE_BUILTIN
-+	/* Fork-inherited app identity, independent of scheduler flags. */
++#if defined(CONFIG_HMA_UIDFAKE_BUILTIN) && !defined(CONFIG_ANDROID_KABI_RESERVE)
 +	u32 hma_uidfake_app;
 +#endif
- };
+ 	randomized_struct_fields_end
  
- static inline struct pid *task_pid(struct task_struct *task)
+ 	/* CPU-specific state of this task: */
 --- a/drivers/misc/Kconfig
 +++ b/drivers/misc/Kconfig
 @@ -524,3 +524,5 @@
@@ -462,7 +472,7 @@
 +}
 --- /dev/null
 +++ b/drivers/misc/hma_uidfake/core.c
-@@ -0,0 +1,330 @@
+@@ -0,0 +1,351 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/* Native integration of HMA UIDFAKE's policy protocol and process identity.
 + * No syscall-table writes, instruction decoding, f_op substitution or TIF bits.
@@ -616,6 +626,31 @@
 +	return new_encode_dev(dev);
 +}
 +
++static int apk_cmp(const void *a, const void *b)
++{
++	const struct uf_apk *x = a, *y = b;
++	if (x->dev != y->dev)
++		return x->dev < y->dev ? -1 : 1;
++	return x->ino < y->ino ? -1 : x->ino != y->ino;
++}
++
++static u32 apk_app(const struct uf_apks *table, const struct inode *inode)
++{
++	struct uf_apk key = { .dev = encode_dev(inode->i_sb->s_dev), .ino = inode->i_ino };
++	u32 lo = 0, hi = table->n;
++	while (lo < hi) {
++		u32 mid = lo + (hi - lo) / 2;
++		int cmp = apk_cmp(&table->entries[mid], &key);
++		if (cmp < 0)
++			lo = mid + 1;
++		else if (cmp > 0)
++			hi = mid;
++		else
++			return app_id(table->entries[mid].uid);
++	}
++	return 0;
++}
++
 +/* Keep all threads of an isolated process consistent; updates never sleep. */
 +static void name_task(u32 id)
 +{
@@ -637,7 +672,7 @@
 +{
 +	const struct uf_apks *table;
 +	struct dentry *d;
-+	u32 i, depth, id = 0;
++	u32 depth, id = 0;
 +	if (READ_ONCE(current->hma_uidfake_app) != PENDING)
 +		return;
 +	/* dget_parent/dput rather than racing a rename through d_parent. */
@@ -649,12 +684,7 @@
 +			rcu_read_lock();
 +			table = rcu_dereference(apks);
 +			if (table)
-+				for (i = 0; i < table->n; i++)
-+					if (table->entries[i].ino == inode->i_ino &&
-+					    table->entries[i].dev == encode_dev(inode->i_sb->s_dev)) {
-+						id = app_id(table->entries[i].uid);
-+						break;
-+					}
++				id = apk_app(table, inode);
 +			rcu_read_unlock();
 +		}
 +		if (id || IS_ROOT(d)) {
@@ -737,6 +767,7 @@
 +	}
 +	/* Failed batches preserve old table and return error so the daemon retries. */
 +	if (!failed) {
++		sort(next->entries, next->n, sizeof(struct uf_apk), apk_cmp, NULL);
 +		rcu_assign_pointer(apks, next);
 +		synchronize_rcu();
 +		kvfree(old);

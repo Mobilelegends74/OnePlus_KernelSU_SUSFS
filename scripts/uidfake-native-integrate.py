@@ -6,6 +6,7 @@ missing anchor rather than silently omitting a hook. Run twice to verify idempot
 """
 import argparse
 import difflib
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,14 +73,38 @@ def integrate(kernel, patch_path):
     edit('kernel/cred.c', credentials)
     edit('fs/open.c', file_open)
     def task_field(text):
-        if 'u32 hma_uidfake_app;' in text:
+        if '/* UIDFAKE identity: native KABI reservation */' in text:
             return text
+        # Migrate an earlier experimental appended field, if present.
+        text = re.sub(r'#ifdef CONFIG_HMA_UIDFAKE_BUILTIN\n'
+                      r'\t/\* Fork-inherited app identity, independent of scheduler flags\. \*/\n'
+                      r'\tu32 hma_uidfake_app;\n#endif\n', '', text)
         start = text.index('struct task_struct {')
         end = text.index('\n};', start)
-        # Preserve offsets of existing task members on the Android ARM64 target.
-        return text[:end] + '\n#ifdef CONFIG_HMA_UIDFAKE_BUILTIN\n' \
-            '\t/* Fork-inherited app identity, independent of scheduler flags. */\n' \
-            '\tu32 hma_uidfake_app;\n#endif' + text[end:]
+        body = text[start:end]
+        reserves = re.findall(r'\tANDROID_KABI_RESERVE\((\d+)\);', body)
+        if reserves:
+            slot = reserves[-1]
+            anchor = f'\tANDROID_KABI_RESERVE({slot});'
+            replacement = ('\t/* UIDFAKE identity: native KABI reservation */\n'
+                '#if defined(CONFIG_HMA_UIDFAKE_BUILTIN) && defined(CONFIG_ANDROID_KABI_RESERVE)\n'
+                f'\tANDROID_KABI_USE({slot}, u32 hma_uidfake_app);\n'
+                '#else\n' + anchor + '\n#endif')
+            body = once(body, anchor, replacement)
+        else:
+            body = body.replace('\trandomized_struct_fields_end',
+                '\t/* UIDFAKE identity: native KABI reservation */\n'
+                '\trandomized_struct_fields_end')
+        # Non-GKI kernels may have no Android reserve. Keep thread_struct last
+        # (required for architectures with variable-sized thread state).
+        anchor = '\trandomized_struct_fields_end'
+        condition = ('#if defined(CONFIG_HMA_UIDFAKE_BUILTIN) && '
+                     '!defined(CONFIG_ANDROID_KABI_RESERVE)' if reserves else
+                     '#ifdef CONFIG_HMA_UIDFAKE_BUILTIN')
+        fallback = (condition + '\n'
+                    '\tu32 hma_uidfake_app;\n#endif\n' + anchor)
+        body = once(body, anchor, fallback)
+        return text[:start] + body + text[end:]
     edit('include/linux/sched.h', task_field)
     edit('drivers/misc/Kconfig', lambda t: t if 'hma_uidfake/Kconfig' in t else
          t + '\nsource "drivers/misc/hma_uidfake/Kconfig"\n')

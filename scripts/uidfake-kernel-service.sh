@@ -19,7 +19,7 @@ if [ -f "$PIDFILE" ]; then
 fi
 echo "$$" > "$PIDFILE"
 trap 'rm -f "$PIDFILE"; exit 0' INT TERM EXIT
-# Bounded logs; failures remain visible and are retried after unlock/boot.
+# Keep the previous start's log; retry failures after unlock/boot.
 while :; do
   [ ! -f "$BASE/sync.log" ] || mv -f "$BASE/sync.log" "$BASE/sync.previous.log"
   "$BASE/sync-tool" > "$BASE/sync.log" 2>&1

@@ -110,8 +110,9 @@ preserved. Ordinary HMA/HMA-OSS app/LSPosed prerequisites remain their own.
 - On the phone still verify boot, SELinux denials, service autostart after reboot,
   HMA/HMA-OSS edits, app-zygote and system-zygote isolation, compat apps and
   removal of rules. Log: /data/adb/uidfake-kernel/sync.log.
-- task_struct gains one conditional field at its end on the ARM64 target,
-  preserving existing member offsets but changing the structure's total size.
-  Vendor/KMI compatibility and other architectures need independent validation.
+- On GKI the task identity uses an available ANDROID_KABI_RESERVE slot through
+  ANDROID_KABI_USE, preserving structure size, offsets and genksyms representation.
+  Other kernels get a conditional field before thread_struct; vendor/KMI
+  compatibility and other architectures still need independent validation.
 - Source anchors avoid Android/Linux version-number checks; a successful OP13R
   build does not prove compatibility with every kernel version or OEM.

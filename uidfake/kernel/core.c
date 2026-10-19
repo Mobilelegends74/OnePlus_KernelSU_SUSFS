@@ -151,6 +151,31 @@ static u32 encode_dev(dev_t dev)
 	return new_encode_dev(dev);
 }
 
+static int apk_cmp(const void *a, const void *b)
+{
+	const struct uf_apk *x = a, *y = b;
+	if (x->dev != y->dev)
+		return x->dev < y->dev ? -1 : 1;
+	return x->ino < y->ino ? -1 : x->ino != y->ino;
+}
+
+static u32 apk_app(const struct uf_apks *table, const struct inode *inode)
+{
+	struct uf_apk key = { .dev = encode_dev(inode->i_sb->s_dev), .ino = inode->i_ino };
+	u32 lo = 0, hi = table->n;
+	while (lo < hi) {
+		u32 mid = lo + (hi - lo) / 2;
+		int cmp = apk_cmp(&table->entries[mid], &key);
+		if (cmp < 0)
+			lo = mid + 1;
+		else if (cmp > 0)
+			hi = mid;
+		else
+			return app_id(table->entries[mid].uid);
+	}
+	return 0;
+}
+
 /* Keep all threads of an isolated process consistent; updates never sleep. */
 static void name_task(u32 id)
 {
@@ -172,7 +197,7 @@ void hma_uidfake_open(struct file *file)
 {
 	const struct uf_apks *table;
 	struct dentry *d;
-	u32 i, depth, id = 0;
+	u32 depth, id = 0;
 	if (READ_ONCE(current->hma_uidfake_app) != PENDING)
 		return;
 	/* dget_parent/dput rather than racing a rename through d_parent. */
@@ -184,12 +209,7 @@ void hma_uidfake_open(struct file *file)
 			rcu_read_lock();
 			table = rcu_dereference(apks);
 			if (table)
-				for (i = 0; i < table->n; i++)
-					if (table->entries[i].ino == inode->i_ino &&
-					    table->entries[i].dev == encode_dev(inode->i_sb->s_dev)) {
-						id = app_id(table->entries[i].uid);
-						break;
-					}
+				id = apk_app(table, inode);
 			rcu_read_unlock();
 		}
 		if (id || IS_ROOT(d)) {
@@ -272,6 +292,7 @@ int uidfake_apk_apply(const u32 *blob, u32 len)
 	}
 	/* Failed batches preserve old table and return error so the daemon retries. */
 	if (!failed) {
+		sort(next->entries, next->n, sizeof(struct uf_apk), apk_cmp, NULL);
 		rcu_assign_pointer(apks, next);
 		synchronize_rcu();
 		kvfree(old);
