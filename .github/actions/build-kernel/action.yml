@@ -1285,7 +1285,12 @@ runs:
           fi
         fi
         
-        patch -p1 --forward < "$SUSFS_FOLDER/kernel_patches/50_add_susfs_in_${{ env.SUSFS_KERNEL_BRANCH }}.patch"
+        SUSFS_APPLY_PATCH=$(mktemp)
+        python3 "$GITHUB_WORKSPACE/scripts/susfs-namespace-context.py" \
+          "$SUSFS_FOLDER/kernel_patches/50_add_susfs_in_${{ env.SUSFS_KERNEL_BRANCH }}.patch" \
+          "$COMMON_KERNEL_FOLDER/fs/namespace.c" "$SUSFS_APPLY_PATCH"
+        patch -p1 --forward < "$SUSFS_APPLY_PATCH"
+        rm -f "$SUSFS_APPLY_PATCH"
         
         # SUSFS's OPEN_REDIRECT code unconditionally calls VMA_PAD_START(), which
         # only exists on GKI branches that carry Google's page-size-migration
