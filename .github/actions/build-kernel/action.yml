@@ -962,15 +962,15 @@ runs:
         echo "Using pershoot/KernelSU-Next ref: $KSU_INPUT"
 
         if [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
-          # setup.sh fetches a shallow branch, so passing a detached historical
-          # SHA directly to setup.sh silently checks out a newer branch head.
+          # The workflow resolves dev-susfs afresh on every run. Build that exact
+          # SHA: setup.sh alone can silently replace a SHA with the branch head.
           curl --fail --location --proto '=https' -LSs             "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh"             | bash -s "dev-susfs"
           cd KernelSU-Next
           if [ -f .git/shallow ]; then git fetch --unshallow origin --quiet; fi
           git fetch origin "$KSU_INPUT" --quiet
           git checkout --detach "$KSU_INPUT"
           test "$(git rev-parse HEAD)" = "$KSU_INPUT" || {
-            echo "::error::Could not pin KernelSU Next to release build80-1 SHA"; exit 1;
+            echo "::error::KernelSU Next checkout differs from the SHA resolved for this run"; exit 1;
           }
         else
           curl --fail --location --proto '=https' -LSs             "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh"             | bash -s "$KSU_INPUT"

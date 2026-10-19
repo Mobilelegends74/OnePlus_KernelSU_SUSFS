@@ -12,6 +12,10 @@ on:
         required: true
         type: boolean
         default: false
+      prerelease:
+        description: 'Publish as a prerelease for device testing (can be promoted without rebuilding)'
+        type: boolean
+        default: false
       op_model:
         description: 'Select the OnePlus kernels to build'
         required: true
@@ -113,7 +117,7 @@ jobs:
           echo "::group::Matrix generation"
           
           input="${{ github.event.inputs.op_model || 'A15' }}"
-          ksu_options_raw='${{ github.event.inputs.ksu_options || '[{"type":"ksun","hash":"66fe35ecf872f60dcd033bebc308e8e2820ffc74"}]' }}'
+          ksu_options_raw='${{ github.event.inputs.ksu_options || '[{"type":"ksun","hash":"dev-susfs"}]' }}'
           if ! ksu_options_normalized=$(echo "$ksu_options_raw" | jq -c 'map(if .type then .type |= ascii_upcase | if .hash == null then if .type == "KSUN" then .hash = "dev-susfs" elif .type == "KSU" then .hash = "main" else .hash end else . end else error("No type found") end)' 2>&1); then
             echo "::error::ksu_options validation failed: $ksu_options_normalized"
             exit 1
@@ -867,6 +871,10 @@ jobs:
           RELEASE_DATE=$(date -u '+%Y-%m-%d')
           RELEASE_NAME="OnePlus 13R | Linux 6.1.118 | SUSFS ${SUSFS_BASE_VERSION} | ${RELEASE_DATE} | Build ${GITHUB_RUN_NUMBER}"
           NEW_TAG="op13r-6.1.118-${RELEASE_DATE}-build${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          if [ "$GITHUB_REF_NAME" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+            RELEASE_NAME="${RELEASE_NAME} | UIDFAKE"
+            NEW_TAG="${NEW_TAG}-uidfake"
+          fi
           echo "RELEASE_NAME=${RELEASE_NAME}" >> "$GITHUB_ENV"
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
           git tag $NEW_TAG
@@ -1156,6 +1164,21 @@ jobs:
           EOF
           
           echo "--- Final Release Notes ---"
+          if [ "$GITHUB_REF_NAME" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+            cat << 'EOF' >> release_notes.md
+
+          ## UIDFAKE: изменения относительно build80 / KernelSU Next 33390
+
+          - Возвращён автоматический выбор актуального `pershoot/KernelSU-Next/dev-susfs`: SHA определяется в начале каждого запуска и проверяется при сборке.
+          - Сохранён встроенный HMA UIDFAKE (`CONFIG_HMA_UIDFAKE_BUILTIN=y`), без отдельного `.ko` и модуля UIDFAKE.
+          - Сохранены автоматическая синхронизация правил HMA/HMA-OSS, обработка изолированных процессов и проверки политики.
+          - NoMount остаётся на стабильном v2.1.1; SUSFS и остальные компоненты не отключены.
+          - ZIP содержит патч UIDFAKE и диагностические сведения сборки; CI проверяет конфигурацию, встроенный компонент и итоговый архив.
+
+          Это тестовая комбинация обновлённого KernelSU Next и UIDFAKE. Успешная компиляция не заменяет проверку загрузки и функций на устройстве.
+          После подтверждения пользователя этот же релиз и его ZIP можно перевести из prerelease в стабильный без повторной сборки.
+          EOF
+          fi
           cat release_notes.md
 
       - name: 🚀 Create GitHub Release
@@ -1176,7 +1199,15 @@ jobs:
           done
 
       - name: Publish release after asset upload
+        env:
+          IS_PRERELEASE: ${{ inputs.prerelease }}
         run: |
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            gh release edit "${{ env.NEW_TAG }}" \
+              --repo "${{ env.REPO_OWNER }}/${{ env.REPO_NAME }}" \
+              --draft=false --prerelease --latest=false
+            exit 0
+          fi
           gh release edit "${{ env.NEW_TAG }}" \
             --repo "${{ env.REPO_OWNER }}/${{ env.REPO_NAME }}" \
             --draft=false --latest
