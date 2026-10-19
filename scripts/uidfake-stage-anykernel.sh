@@ -16,6 +16,7 @@ chmod 755 "$ak3/uidfake/sync-tool"
 cp "$root/scripts/uidfake-kernel-service.sh" "$ak3/uidfake/service.sh"
 cp "$root/uidfake/hma-uidfake-native.patch" "$ak3/uidfake/"
 cp "$root/docs/uidfake-op13r.md" "$ak3/uidfake/README.md"
+cp "$root/uidfake/LICENSE" "$root/uidfake/NOTICE" "$ak3/uidfake/"
 python3 - "$ak3/anykernel.sh" <<'PY'
 from pathlib import Path
 import sys

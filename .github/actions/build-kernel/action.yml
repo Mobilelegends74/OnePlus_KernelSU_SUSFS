@@ -2141,6 +2141,7 @@ runs:
       if: ${{ github.ref_name == 'UIDFAKE-op13r-6.1.118-build80' && env.OP_MODEL == 'OP13r' }}
       run: |
         set -euo pipefail
+        python3 "$GITHUB_WORKSPACE/scripts/uidfake-test-native.py"
         bash "$GITHUB_WORKSPACE/scripts/uidfake-integrate-kernel.sh" "$COMMON_KERNEL_FOLDER"
         test -f "$COMMON_KERNEL_FOLDER/drivers/misc/hma_uidfake/core.c"
         echo "UIDFAKE built-in sources installed"
@@ -2594,6 +2595,7 @@ runs:
 
         if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
           bash "$GITHUB_WORKSPACE/scripts/uidfake-stage-anykernel.sh" "$AK3_FOLDER"
+          cp "$GITHUB_WORKSPACE/uidfake/hma-uidfake-native.patch" "$ARTIFACTS_FOLDER/"
         fi
 
         

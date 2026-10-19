@@ -40,6 +40,7 @@ static u32 g_staged_total; /* bytes */
 static u32 g_staged_len; /* bytes written so far */
 static u32 g_staged_crc;
 static u32 g_staged_owner;
+static bool g_staged_active;
 
 /* How big a staged blob may be (KAUX_KIND_* and its layout are in kaux.h). */
 /* What the two ends actually send: a policy is at most POLICY_MAX_PAIRS pairs of two
@@ -113,8 +114,10 @@ static int kaux_set_begin(struct sk_buff *skb, struct genl_info *info)
 		goto out;
 	}
 	b = (const struct kaux_begin *)p;
-	if (b->kind > KAUX_KIND_MAX || b->bytes == 0 ||
-	    b->bytes > KAUX_STAGED_BYTES) {
+	if (b->kind > KAUX_KIND_MAX || b->bytes > KAUX_STAGED_BYTES ||
+	    (b->kind == KAUX_KIND_POLICY &&
+	     (b->bytes % 8u || b->bytes / 8u > POLICY_MAX_PAIRS)) ||
+	    (b->kind == KAUX_KIND_APKS && b->bytes < 4)) {
 		rc = -EINVAL;
 		goto out;
 	}
@@ -124,6 +127,7 @@ static int kaux_set_begin(struct sk_buff *skb, struct genl_info *info)
 	g_staged_len = 0;
 	g_staged_crc = b->crc32;
 	g_staged_owner = info->snd_portid;
+	g_staged_active = true;
 
 out:
 	mutex_unlock(&g_staged_lock);
@@ -149,7 +153,7 @@ static int kaux_set_page(struct sk_buff *skb, struct genl_info *info)
 		rc = -EINVAL;
 		goto out;
 	}
-	if (g_staged_total == 0 || g_staged_owner != info->snd_portid ||
+	if (!g_staged_active || g_staged_owner != info->snd_portid ||
 	    offset != g_staged_len ||
 	    bytes > g_staged_total - g_staged_len) {
 		rc = -EINVAL;
@@ -174,7 +178,7 @@ static int kaux_set_commit(struct sk_buff *skb, struct genl_info *info)
 
 	mutex_lock(&g_apply_lock);
 	mutex_lock(&g_staged_lock);
-	if (g_staged_total == 0 || g_staged_owner != info->snd_portid ||
+	if (!g_staged_active || g_staged_owner != info->snd_portid ||
 	    g_staged_len != g_staged_total) {
 		rc = -EINVAL;
 		goto out;
@@ -201,6 +205,7 @@ static int kaux_set_commit(struct sk_buff *skb, struct genl_info *info)
 	memcpy(g_apply, g_staged, bytes);
 	g_staged_total = 0;
 	g_staged_len = 0;
+	g_staged_active = false;
 
 out:
 	mutex_unlock(&g_staged_lock);

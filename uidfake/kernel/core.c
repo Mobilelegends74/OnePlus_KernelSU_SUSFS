@@ -119,9 +119,13 @@ void hma_uidfake_creds(const struct cred *old, const struct cred *new)
 bool hma_uidfake_hidden(unsigned int target)
 {
 	const struct uf_policy *p;
+	kuid_t mapped = make_kuid(current_user_ns(), target);
 	u32 tag = READ_ONCE(current->hma_uidfake_app);
 	u32 caller;
 	bool hidden = false;
+	if (!uid_valid(mapped))
+		return false;
+	target = __kuid_val(mapped);
 	if (tag == PENDING) {
 		/* Close the APK attribution window on the first UID query. */
 		cmpxchg(&current->hma_uidfake_app, PENDING, 0);
@@ -151,10 +155,16 @@ static u32 encode_dev(dev_t dev)
 static void name_task(u32 id)
 {
 	struct task_struct *leader = current->group_leader, *t;
+	u32 chosen;
 	rcu_read_lock();
-	cmpxchg(&leader->hma_uidfake_app, PENDING, id);
+	chosen = cmpxchg(&leader->hma_uidfake_app, PENDING, id);
+	if (chosen == PENDING)
+		chosen = id;
+	if (!chosen)
+		goto out; /* group leader has already closed its attribution window */
 	for_each_thread(leader, t)
-		cmpxchg(&t->hma_uidfake_app, PENDING, id);
+		cmpxchg(&t->hma_uidfake_app, PENDING, chosen);
+out:
 	rcu_read_unlock();
 }
 
