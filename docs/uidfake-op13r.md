@@ -109,6 +109,9 @@ preserved. Ordinary HMA/HMA-OSS app/LSPosed prerequisites remain their own.
 - Host ASan/UBSan tests compile the actual native core, exercising caller rules,
   wildcard, isolation/inheritance, revocation, malformed APK data and OOM retention.
 - Source integrator checks all native call sites and is idempotent.
+- Free KABI-slot selection tracks preprocessor nesting: slots consumed by
+  Droidspaces/SYSVIPC or SLIM_SCHED are not reused. The SYSVIPC patch combination
+  is regression-checked; on this combination UIDFAKE uses slot 5, not 6–8.
 - CI checks the final CONFIG_HMA_UIDFAKE_BUILTIN=y and builds Image.
 - CI also checks the built-in archive and Image marker; the ZIP includes the
   final kernel.config and UIDFAKE entries from System.map in build-verification.txt.

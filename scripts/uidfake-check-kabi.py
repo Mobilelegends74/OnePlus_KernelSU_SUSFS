@@ -8,6 +8,15 @@ import tempfile
 
 kernel = Path(sys.argv[1])
 sched = (kernel / 'include/linux/sched.h').read_text()
+task_start = sched.index('struct task_struct {')
+marker = sched.index('/* UIDFAKE identity: native KABI reservation */', task_start)
+depth = 0
+for line in sched[task_start:marker].splitlines():
+    if re.match(r'\s*#\s*(if|ifdef|ifndef)\b', line):
+        depth += 1
+    elif re.match(r'\s*#\s*endif\b', line):
+        depth -= 1
+assert depth == 0, 'UIDFAKE task field is inside a conditional feature branch'
 match = re.search(r'/\* UIDFAKE identity: native KABI reservation \*/\n'
                   r'(#if.*?\n#endif)', sched, re.S)
 if not match or 'ANDROID_KABI_USE' not in match.group(1):

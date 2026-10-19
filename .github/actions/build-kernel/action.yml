@@ -2397,6 +2397,15 @@ runs:
         
         BUILD_START=$(date +%s)
         set -o pipefail
+
+        if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+          echo "UIDFAKE: compile native component and call sites before the full Image"
+          UF_MAKE=(make LD="$COMMON_KERNEL_FOLDER/ld-wrapper" HOSTLD="$COMMON_KERNEL_FOLDER/ld-wrapper"
+            -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS"
+            CONFIG_FAKE_DISABLE="$CONFIG_FAKE_DISABLE")
+          "${UF_MAKE[@]}" drivers/misc/hma_uidfake/ 2>&1 | tee uidfake-preflight.log
+          "${UF_MAKE[@]}" kernel/user.o kernel/sys.o kernel/cred.o fs/open.o block/ioprio.o 2>&1 | tee -a uidfake-preflight.log
+        fi
         
         if [ "${{ inputs.debug }}" == "true" ]; then
           make V=1 LD="$COMMON_KERNEL_FOLDER/ld-wrapper" HOSTLD="$COMMON_KERNEL_FOLDER/ld-wrapper" -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS" CONFIG_FAKE_DISABLE="$CONFIG_FAKE_DISABLE" Image modules 2>&1 | tee build.log

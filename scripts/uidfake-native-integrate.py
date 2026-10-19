@@ -85,8 +85,20 @@ def integrate(kernel, patch_path):
     edit('kernel/cred.c', credentials)
     edit('fs/open.c', file_open)
     def task_field(text):
-        if '/* UIDFAKE identity: native KABI reservation */' in text:
-            return text
+        # Re-evaluate existing integrations, including an old slot placed in
+        # the inactive SYSVIPC/SLIM_SCHED fallback branch.
+        text = re.sub(
+            r'\t/\* UIDFAKE identity: native KABI reservation \*/\n'
+            r'#if defined\(CONFIG_HMA_UIDFAKE_BUILTIN\) && defined\(CONFIG_ANDROID_KABI_RESERVE\)\n'
+            r'\tANDROID_KABI_USE\((\d+), u32 hma_uidfake_app\);\n#else\n'
+            r'\tANDROID_KABI_RESERVE\(\1\);\n#endif',
+            lambda m: f'\tANDROID_KABI_RESERVE({m.group(1)});', text)
+        text = re.sub(r'#if defined\(CONFIG_HMA_UIDFAKE_BUILTIN\) && '
+                      r'!defined\(CONFIG_ANDROID_KABI_RESERVE\)\n'
+                      r'\tu32 hma_uidfake_app;\n#endif\n', '', text)
+        text = text.replace('#ifdef CONFIG_HMA_UIDFAKE_BUILTIN\n'
+                            '\tu32 hma_uidfake_app;\n#endif\n', '')
+        text = text.replace('\t/* UIDFAKE identity: native KABI reservation */\n', '')
         # Migrate an earlier experimental appended field, if present.
         text = re.sub(r'#ifdef CONFIG_HMA_UIDFAKE_BUILTIN\n'
                       r'\t/\* Fork-inherited app identity, independent of scheduler flags\. \*/\n'
@@ -94,7 +106,22 @@ def integrate(kernel, patch_path):
         start = text.index('struct task_struct {')
         end = text.index('\n};', start)
         body = text[start:end]
-        reserves = re.findall(r'\tANDROID_KABI_RESERVE\((\d+)\);', body)
+        reserves, depth = [], 0
+        for line in body.splitlines():
+            directive = line.lstrip()
+            if re.match(r'#\s*(if|ifdef|ifndef)\b', directive):
+                depth += 1
+            elif re.match(r'#\s*endif\b', directive):
+                depth -= 1
+                if depth < 0:
+                    raise RuntimeError('unbalanced task_struct preprocessor conditions')
+            slot = re.fullmatch(r'\tANDROID_KABI_RESERVE\((\d+)\);', line)
+            if slot and depth == 0:
+                reserves.append(slot.group(1))
+        if depth:
+            raise RuntimeError('unbalanced task_struct preprocessor conditions')
+        if not reserves and 'ANDROID_KABI_' in body:
+            raise RuntimeError('no unconditional free task_struct KABI slot; refusing an ABI change')
         if reserves:
             slot = reserves[-1]
             anchor = f'\tANDROID_KABI_RESERVE({slot});'
