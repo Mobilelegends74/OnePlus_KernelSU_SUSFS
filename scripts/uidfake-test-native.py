@@ -10,13 +10,13 @@ core = root / 'uidfake/kernel/core.c'
 with tempfile.TemporaryDirectory(prefix='uidfake-tests-') as tmp:
     tmp = Path(tmp)
     # Provide only the headers requested by the actual production source.
-    headers = core.read_text() + (core.parent / 'netlink.c').read_text()
+    headers = ''.join(p.read_text() for p in core.parent.glob('*.c'))
     for name in re.findall(r'^#include <([^>]+)>', headers, re.M):
         p = tmp / name
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text('/* host API is declared by host-shim.h */\n')
     (tmp / 'linux/types.h').write_text('/* types supplied by host shim */\n')
-    for test in ['core-test.c', 'netlink-test.c']:
+    for test in ['core-test.c', 'netlink-test.c', 'policy-stress.c']:
         binary = tmp / test.removesuffix('.c')
         subprocess.run([
             'cc', '-std=gnu11', '-O1', '-g', '-Wall', '-Wextra', '-Werror',

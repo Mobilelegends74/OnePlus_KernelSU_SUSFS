@@ -29,14 +29,15 @@ The CI wrapper also enables CONFIG_HMA_UIDFAKE_BUILTIN=y in gki_defconfig.
 
 ## Architecture
 
-The bool option links core.o and netlink.o into Image. There is no .ko,
+The bool option links core.o, policy.o and netlink.o into Image. There is no .ko,
 module loader, instruction scanner, kprobe dependency, syscall-table patch,
 f_op replacement or use of spare scheduler flags.
 Header paths are rooted at srctree and support separate O= output directories.
 
-Native calls in kernel/sys.c and block/ioprio.c filter PRIO_USER /
-IOPRIO_WHO_USER for getpriority, setpriority, ioprio_get and ioprio_set.
-They use the existing ESRCH path and balanced RCU exits. The common C syscall
+Native calls in kernel/sys.c and block/ioprio.c translate hidden PRIO_USER /
+IOPRIO_WHO_USER targets for getpriority, setpriority, ioprio_get and ioprio_set.
+The ordinary kernel lookup produces ESRCH for the same-bucket replacement;
+existing RCU exits remain unchanged. The common C syscall
 implementations also cover the compat ABI. Existing capability, LSM, namespace
 and argument checks remain in their normal code paths.
 
@@ -47,12 +48,15 @@ children are attributed from a successfully security-checked file open and
 the HMA companion's installed-code inode map. The first UID query closes an
 unresolved attribution window. Later UID changes cannot select another identity.
 
-The native implementation uses sorted RCU policy snapshots and binary search,
-retaining caller/target rules, wildcard caller, protected system UIDs and the
-upstream app-id caller semantics. Targets use kernel-mapped full UIDs.
-It intentionally does not carry over instruction-dependent hash mirroring or
-the LKM's timing-equalization algorithm: constant-time indistinguishability
-against microbenchmarks is **not claimed**.
+The native implementation retains upstream's pooled caller masks, RCU snapshots,
+same-bucket replacement, wildcard caller and app-id caller semantics. A typed
+helper in kernel/user.c supplies the actual hash bucket and hash size without
+instruction decoding. ARM64 retains the branchless csel replacement path.
+Queries in a non-initial user namespace keep native kernel behavior rather than
+using an invalid global-UID replacement. Microbenchmark indistinguishability
+still requires measurement on hardware and is not claimed from compilation.
+The port also fixes mask-pool capacity, empty-policy handling and lookup wrap
+when the kernel UID hash has more bucket lines than the policy snapshot.
 Policy and APK updates publish complete validated snapshots. Malformed updates,
 allocation failures and unresolved APK paths keep the preceding snapshot.
 
@@ -106,6 +110,8 @@ preserved. Ordinary HMA/HMA-OSS app/LSPosed prerequisites remain their own.
   wildcard, isolation/inheritance, revocation, malformed APK data and OOM retention.
 - Source integrator checks all native call sites and is idempotent.
 - CI checks the final CONFIG_HMA_UIDFAKE_BUILTIN=y and builds Image.
+- CI also checks the built-in archive and Image marker; the ZIP includes the
+  final kernel.config and UIDFAKE entries from System.map in build-verification.txt.
 - The ZIP is marked _UIDFAKE and contains the companion, service, README and patch.
 - On the phone still verify boot, SELinux denials, service autostart after reboot,
   HMA/HMA-OSS edits, app-zygote and system-zygote isolation, compat apps and

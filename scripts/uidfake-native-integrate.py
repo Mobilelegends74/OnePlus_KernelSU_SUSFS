@@ -37,9 +37,10 @@ def integrate(kernel, patch_path):
 
     def priority(text):
         text = header(text)
+        text = text.replace('\t\tif (hma_uidfake_hidden(who))\n\t\t\tbreak;\n', '')
         # All priority users converge here, including the compat ABI.
         anchor = '\tcase PRIO_USER:\n'
-        check = '\t\tif (hma_uidfake_hidden(who))\n\t\t\tbreak;\n'
+        check = '\t\twho = hma_uidfake_translate(who);\n'
         if text.count(anchor) != 2:
             raise RuntimeError('expected PRIO_USER in getpriority and setpriority')
         if text.count(check) == 2:
@@ -48,8 +49,9 @@ def integrate(kernel, patch_path):
 
     def ioprio(text):
         text = header(text)
+        text = text.replace('\t\t\tif (hma_uidfake_hidden(who))\n\t\t\t\tbreak;\n', '')
         anchor = '\t\tcase IOPRIO_WHO_USER:\n'
-        check = '\t\t\tif (hma_uidfake_hidden(who))\n\t\t\t\tbreak;\n'
+        check = '\t\t\twho = hma_uidfake_translate(who);\n'
         if text.count(anchor) != 2:
             raise RuntimeError('expected IOPRIO_WHO_USER in get and set')
         if text.count(check) == 2:
@@ -70,6 +72,16 @@ def integrate(kernel, patch_path):
 
     edit('kernel/sys.c', priority)
     edit('block/ioprio.c', ioprio)
+    def user_hash(text):
+        text = header(text)
+        anchor = 'static struct hlist_head uidhash_table[UIDHASH_SZ];'
+        helper = ('\n#ifdef CONFIG_HMA_UIDFAKE_BUILTIN\n'
+                  'unsigned int hma_uidfake_bucket(unsigned int uid)\n'
+                  '{\n\treturn uidhashentry(KUIDT_INIT(uid)) - uidhash_table;\n}\n'
+                  'unsigned int hma_uidfake_hash_bits(void)\n'
+                  '{\n\treturn UIDHASH_BITS;\n}\n#endif\n')
+        return once(text, anchor, anchor + helper)
+    edit('kernel/user.c', user_hash)
     edit('kernel/cred.c', credentials)
     edit('fs/open.c', file_open)
     def task_field(text):

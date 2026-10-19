@@ -1,4 +1,5 @@
 #include "host-shim.h"
+#include "policy.c"
 #include "core.c"
 int netlink_init(void) { return 0; }
 
@@ -46,7 +47,7 @@ int main(void)
     fsuid = 110555;
     assert(hma_uidfake_hidden(10666));
     fail_alloc = 1;
-    assert(policy_apply(NULL, 0) == -ENOMEM);
+    assert(policy_apply(rules, 1) == -ENOMEM);
     fail_alloc = 0;
     assert(hma_uidfake_hidden(10666));
     assert(policy_apply(NULL, POLICY_MAX_PAIRS + 1) == -E2BIG);
@@ -88,7 +89,7 @@ int main(void)
     uidfake_status_get(&status);
     assert(!status.apk_inodes && !status.policy_pairs);
     assert(!rcu_depth && !dentry_refs);
-    kvfree(rcu_dereference(policy));
+    policy_free();
     kvfree(rcu_dereference(apks));
     puts("UIDFAKE native core: policy, isolation, revocation and malformed-input tests passed");
     return 0;

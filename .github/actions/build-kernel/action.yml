@@ -2143,6 +2143,7 @@ runs:
         set -euo pipefail
         python3 "$GITHUB_WORKSPACE/scripts/uidfake-test-native.py"
         bash "$GITHUB_WORKSPACE/scripts/uidfake-integrate-kernel.sh" "$COMMON_KERNEL_FOLDER"
+        python3 "$GITHUB_WORKSPACE/scripts/uidfake-check-kabi.py" "$COMMON_KERNEL_FOLDER"
         test -f "$COMMON_KERNEL_FOLDER/drivers/misc/hma_uidfake/core.c"
         echo "UIDFAKE built-in sources installed"
 
@@ -2428,6 +2429,19 @@ runs:
           echo "::endgroup::"
           exit 1
         fi
+
+        if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+          test -s "$OUT/drivers/misc/hma_uidfake/built-in.a"
+          grep -aFq 'hma_uidfake: native built-in policy ready' "$IMG"
+          mkdir -p "$AK3_FOLDER/uidfake"
+          cp "$OUT/.config" "$AK3_FOLDER/uidfake/kernel.config"
+          {
+            echo "Source commit: $GITHUB_SHA"
+            echo "CONFIG_HMA_UIDFAKE_BUILTIN=y; built-in archive and Image marker verified"
+            grep '^CONFIG_ANDROID_KABI_RESERVE=' "$OUT/.config" || true
+            awk '$3 ~ /hma_uidfake|uidfake_policy|kaux_family/ {print}' "$OUT/System.map"
+          } > "$AK3_FOLDER/uidfake/build-verification.txt"
+        fi
         
         IMG_SIZE=$(stat -c%s "$IMG")
         
@@ -2633,6 +2647,10 @@ runs:
         fi
         
         mv "$ZIP_NAME" "$ARTIFACTS_FOLDER/"
+
+        if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+          python3 "$GITHUB_WORKSPACE/scripts/uidfake-verify-zip.py" "$ARTIFACTS_FOLDER/$ZIP_NAME"
+        fi
         
         find "$ARTIFACTS_FOLDER" -maxdepth 1 -type f ! -name "$ZIP_NAME" -delete
         

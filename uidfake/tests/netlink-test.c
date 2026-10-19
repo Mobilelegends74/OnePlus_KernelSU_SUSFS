@@ -1,4 +1,5 @@
 #include "netlink-shim.h"
+#include "policy.c"
 #include "core.c"
 #include "netlink.c"
 
@@ -58,7 +59,7 @@ int main(void)
     assert(!kaux_ping(NULL,&info));
     assert(!kaux_status(NULL,&info));
     netlink_exit();
-    kvfree(rcu_dereference(policy));
+    policy_free();
     assert(!rcu_depth && !dentry_refs);
     puts("UIDFAKE netlink: CRC, ownership, authorization, empty revocation and replay tests passed");
     return 0;

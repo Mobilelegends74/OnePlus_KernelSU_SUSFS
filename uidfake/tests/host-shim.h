@@ -8,13 +8,13 @@
 #include <string.h>
 #include <sys/types.h>
 typedef uint32_t u32;
+typedef uint16_t u16;
 typedef uint64_t u64;
 typedef uint8_t u8;
 typedef u32 kuid_t;
 static int namespace_token;
+#define init_user_ns namespace_token
 #define current_user_ns() (&namespace_token)
-static kuid_t make_kuid(int *ns, u32 uid) { (void)ns; return uid; }
-static bool uid_valid(kuid_t uid) { return uid != UINT32_MAX; }
 #define __rcu
 #define __init
 #define late_initcall(fn)
@@ -43,6 +43,31 @@ static void *kvzalloc(size_t n, int flag) {
     return fail_alloc ? NULL : calloc(1, n);
 }
 #define kvfree free
+#define kfree free
+#define kcalloc(n, s, f) kvzalloc((n) * (s), (f))
+#define kvcalloc(n, s, f) kvzalloc((n) * (s), (f))
+#define kvmalloc_array(n, s, f) kvzalloc((n) * (s), (f))
+#define kzalloc(n, f) kvzalloc(n, f)
+#define xchg(p,v) __extension__ ({ __typeof__(*(p)) old_ = *(p); *(p)=(v); old_; })
+#define unlikely(x) (x)
+#define likely(x) (x)
+#define pr_warn(...) ((void)0)
+static inline u32 ilog2(u32 x) { return 31u - __builtin_clz(x); }
+struct user_struct { int unused; };
+#define KUIDT_INIT(x) (x)
+static struct user_struct *find_user(u32 uid) {
+    static struct user_struct live;
+    return uid >= 10000 && uid < 20000 ? &live : NULL;
+}
+static void free_uid(struct user_struct *user) { (void)user; }
+static u32 host_hash_bits = 7;
+static bool host_hash_multiply;
+static unsigned int hma_uidfake_hash_bits(void) { return host_hash_bits; }
+static unsigned int hma_uidfake_bucket(unsigned int uid) {
+    if (host_hash_multiply)
+        return (u32)(uid * 0x61c88647u) >> (32 - host_hash_bits);
+    return ((uid >> host_hash_bits) + uid) & ((1u << host_hash_bits) - 1);
+}
 #define sort(p, n, s, cmp, swap) qsort(p, n, s, cmp)
 static size_t strscpy(char *dst, const char *src, size_t n) {
     size_t len = strlen(src);
