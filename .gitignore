@@ -6,3 +6,4 @@
 *.Identifier
 *.orig
 *.rej
+/build-artifacts/
