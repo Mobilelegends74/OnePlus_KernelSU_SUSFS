@@ -5,12 +5,6 @@ permissions:
   actions: write
 
 on:
-  push:
-    branches: [UIDFAKE-op13r-6.1.118-build80]
-    paths:
-      - '.github/actions/build-kernel/action.yml'
-      - '.github/workflows/build-kernel-release.yml'
-      - 'scripts/uidfake-*'
   workflow_dispatch:
     inputs:
       make_release:

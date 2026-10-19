@@ -2142,7 +2142,7 @@ runs:
       run: |
         set -euo pipefail
         bash "$GITHUB_WORKSPACE/scripts/uidfake-integrate-kernel.sh" "$COMMON_KERNEL_FOLDER"
-        test -f "$COMMON_KERNEL_FOLDER/drivers/misc/hma_uidfake/hooks.c"
+        test -f "$COMMON_KERNEL_FOLDER/drivers/misc/hma_uidfake/core.c"
         echo "UIDFAKE built-in sources installed"
 
     - name: Build Kernel
