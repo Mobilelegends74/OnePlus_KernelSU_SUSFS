@@ -606,6 +606,9 @@ jobs:
         if: ${{ matrix.disk_cleanup }}
         uses: ./.github/actions/disk-cleanup
 
+      - name: Verify stable release and cache retention policy
+        run: python3 scripts/test-build-policy.py
+
       - name: Install Minimal Dependencies
         run: |
           set -euo pipefail
@@ -654,7 +657,7 @@ jobs:
             
             SETTINGS=(
               "CCACHE_DIR=$CACHE_DIR"
-              "CCACHE_MAXSIZE=12G"
+              "CCACHE_MAXSIZE=20G"
               "CCACHE_COMPILERCHECK=content"
               "CCACHE_BASEDIR=${GITHUB_WORKSPACE}"
               "CCACHE_NOHASHDIR=true"
@@ -979,6 +982,13 @@ jobs:
               [[ "$ntsync" == "true" ]] && features+=("🔃 NTSync")
               [[ "$bore" == "true" ]] && features+=("🧠 BORE 5.3.0")
               [[ "$lz4kd" == "true" || "$lz4k" == "true" ]] && features+=("⚡ LZ4K/LZ4KD ZRAM")
+              features+=("NoMount stable")
+              if [ "$model" = "OP13r" ]; then
+                features+=("VPNHide built-in")
+                if [ "$GITHUB_REF_NAME" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+                  features+=("HMA UIDFAKE built-in")
+                fi
+              fi
               
               total=${#features[@]}
               if [ $total -eq 0 ]; then
@@ -1017,15 +1027,26 @@ jobs:
           
           if [ ${#device_info[@]} -gt 0 ]; then
             first_entry=$(printf '%s\n' "${!device_info[@]}" | sort | head -n1)
-            IFS='|' read -r _ _ _ _ ksu_ver_global _ _ <<< "${device_info["$first_entry"]}"
+            IFS='|' read -r _ _ _ _ ksu_ver_global _ first_zipfile <<< "${device_info["$first_entry"]}"
           else
             echo "::error::No device info found!" >&2
             exit 1
           fi
 
-          VPNHIDE_COMMIT="$(git ls-remote https://github.com/okhsunrog/vpnhide.git refs/heads/main | awk '{print $1}')"
-          [ -n "$VPNHIDE_COMMIT" ] || VPNHIDE_COMMIT="main"
-          NOMOUNT_COMMIT="7046c7ad3ee0bf4ae66e80f6b93b1e30db0cb4e3"
+          # Read actual component identities from the completed ZIP, never query
+          # upstream again while publishing (HEAD may have advanced meanwhile).
+          BUILD_COMPONENTS="$(unzip -p "downloaded-artifacts/${first_zipfile}.zip" build-components.json)"
+          NOMOUNT_TAG="$(jq -er .nomount_tag <<< "$BUILD_COMPONENTS")"
+          NOMOUNT_COMMIT="$(jq -er .nomount_sha <<< "$BUILD_COMPONENTS")"
+          VPNHIDE_COMMIT="$(jq -er .vpnhide_sha <<< "$BUILD_COMPONENTS")"
+          [[ "$NOMOUNT_COMMIT" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$VPNHIDE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          UIDFAKE_FEATURE=""
+          UIDFAKE_CONFIG_ROW=""
+          if [ "$GITHUB_REF_NAME" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+            UIDFAKE_FEATURE='- **HMA UIDFAKE built-in** — UID filtering, isolated processes and automatic HMA/HMA-OSS rule synchronization; no separate UIDFAKE LKM/module'
+            UIDFAKE_CONFIG_ROW='| **HMA UIDFAKE** | Built-in kernel patch, CONFIG_HMA_UIDFAKE_BUILTIN=y |'
+          fi
           
           cat << EOF >> release_notes.md
           
@@ -1075,7 +1096,8 @@ jobs:
           | **VPNHide Built-in** | Enabled for OP13R (Android 14 / Linux 6.1) |
           | **VPNHide Commit** | [\`${VPNHIDE_COMMIT:0:8}\`](https://github.com/okhsunrog/vpnhide/commit/$VPNHIDE_COMMIT) |
           | **NoMount Commit** | [\`${NOMOUNT_COMMIT:0:8}\`](https://github.com/maxsteeel/nomount/commit/$NOMOUNT_COMMIT) |
-          | **NoMount Release** | [v2.1.1 stable](https://github.com/maxsteeel/nomount/releases/tag/v2.1.1) |
+          | **NoMount Release** | [$NOMOUNT_TAG stable](https://github.com/maxsteeel/nomount/releases/tag/$NOMOUNT_TAG) |
+          $UIDFAKE_CONFIG_ROW
           
           ---
           
@@ -1094,10 +1116,11 @@ jobs:
           fi
           cat << EOF >> release_notes.md
           - **SUSFS $SUSFS_BASE_VERSION**
-          - **Maxsteel NoMount**
+          - **[Maxsteel NoMount $NOMOUNT_TAG](https://github.com/maxsteeel/nomount/releases/tag/$NOMOUNT_TAG)** — latest stable release resolved for this build
           - **Baseband Guard (BBG)**
           - **Unicode bypass fix**
-          - **VPNHide Built-in** for OP13R (Android 14 / Linux 6.1)
+          - **[VPNHide Built-in](https://github.com/okhsunrog/vpnhide/commit/$VPNHIDE_COMMIT)** for OP13R (Android 14 / Linux 6.1)
+          $UIDFAKE_FEATURE
 
           ### Performance and memory
           - **BORE 5.3.0 scheduler**
@@ -1132,8 +1155,8 @@ jobs:
           ## Changes in OP13R-6.1.118v1
           
           ### This Release
-          - NoMount kernel source pinned to stable v2.1.1 instead of the dev branch.
-          - Compatibility test for reported boot shutdown with the NoMount module; not yet verified on-device.
+          - NoMount automatically tracks the latest published stable release; its exact commit is fixed for this build only.
+          - Restored ccache entries are retained between builds without artificial aging or 12-hour eviction; size limit increased to 20 GB.
           EOF
           if jq -e 'any(.[]; .bore == true)' <<< "$JSON_BUILD_DATA" >/dev/null; then
             echo "- Added BORE 5.3.0 scheduler for improved interactivity on OP13R." >> release_notes.md
@@ -1167,17 +1190,18 @@ jobs:
           if [ "$GITHUB_REF_NAME" = "UIDFAKE-op13r-6.1.118-build80" ]; then
             cat << 'EOF' >> release_notes.md
 
-          ## UIDFAKE: изменения относительно build80 / KernelSU Next 33390
+          ## HMA UIDFAKE — встроенный патч ядра
 
-          - Возвращён автоматический выбор актуального `pershoot/KernelSU-Next/dev-susfs`: SHA определяется в начале каждого запуска и проверяется при сборке.
-          - Сохранён встроенный HMA UIDFAKE (`CONFIG_HMA_UIDFAKE_BUILTIN=y`), без отдельного `.ko` и модуля UIDFAKE.
-          - Сохранены автоматическая синхронизация правил HMA/HMA-OSS, обработка изолированных процессов и проверки политики.
-          - NoMount остаётся на стабильном v2.1.1; SUSFS и остальные компоненты не отключены.
-          - ZIP содержит патч UIDFAKE и диагностические сведения сборки; CI проверяет конфигурацию, встроенный компонент и итоговый архив.
+          - HMA UIDFAKE компилируется внутри ядра (`CONFIG_HMA_UIDFAKE_BUILTIN=y`), без отдельного `.ko` или KernelSU-модуля UIDFAKE.
+          - Автоматическая синхронизация правил HMA/HMA-OSS; фильтрация UID и обработка изолированных процессов.
+          - ZIP содержит повторно применяемый патч UIDFAKE и сведения проверки встроенного компонента.
+          - KernelSU Next и SUSFS продолжают обновляться автоматически; NoMount выбирается только из стабильных релизов.
 
-          Это тестовая комбинация обновлённого KernelSU Next и UIDFAKE. Успешная компиляция не заменяет проверку загрузки и функций на устройстве.
-          После подтверждения пользователя этот же релиз и его ZIP можно перевести из prerelease в стабильный без повторной сборки.
+          Перед установкой сохраните резервную копию boot. Новые сочетания компонентов требуют проверки на устройстве; успешная компиляция не гарантирует совместимость со всеми модулями.
           EOF
+            printf '\n[Исходный патч UIDFAKE](https://github.com/%s/%s/blob/%s/uidfake/hma-uidfake-native.patch) · [HMA UID Fake fork](https://github.com/Mobilelegends74/hma-uidfake)\n' "$REPO_OWNER" "$REPO_NAME" "$GITHUB_SHA" >> release_notes.md
+            # Keep the feature explicitly visible outside the per-device table.
+            printf '\n**Included kernel patch: HMA UIDFAKE built-in — UID filtering and HMA/HMA-OSS policy synchronization.**\n' >> release_notes.md
           fi
           cat release_notes.md
 

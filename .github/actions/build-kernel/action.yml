@@ -736,8 +736,7 @@ runs:
           echo "Pre-build cache statistics:"
           ccache -s | head -n 20
           
-          echo "Updating atime to achive cache eviction"
-          find ${{ env.CCACHE_DIR }} -type f -exec touch -t $(date -d "1 day ago" +%Y%m%d%H%M) {} +
+          echo "Preserving restored cache timestamps and entries for subsequent builds"
         else
           echo "⚠️ No existing cache - building from scratch"
           echo "Cache will be populated for future builds"
@@ -1369,25 +1368,29 @@ runs:
         
         echo "::endgroup::"
 
-    - name: Apply Maxsteel NoMount stable v2.1.1
+    - name: Apply latest stable Maxsteel NoMount release
       shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
       run: |
         set -euo pipefail
         echo "::group::Apply Maxsteel NoMount"
 
+        NM_RELEASE_JSON="$(python3 "$GITHUB_WORKSPACE/scripts/resolve-nomount-stable.py")"
+        NM_TAG="$(jq -er .nomount_tag <<< "$NM_RELEASE_JSON")"
+        NM_SHA="$(jq -er .nomount_sha <<< "$NM_RELEASE_JSON")"
         NM_SRC="$COMMON_KERNEL_FOLDER/NoMount"
         rm -rf -- "$NM_SRC"
 
         git clone \
           --depth 1 \
           --single-branch \
-          --branch v2.1.1 \
+          --branch "$NM_TAG" \
           https://github.com/maxsteeel/nomount.git \
           "$NM_SRC"
 
-        NM_SHA="$(git -C "$NM_SRC" rev-parse HEAD)"
-        test "$NM_SHA" = "7046c7ad3ee0bf4ae66e80f6b93b1e30db0cb4e3" || {
-          echo "::error::NoMount stable tag changed unexpectedly"
+        test "$(git -C "$NM_SRC" rev-parse HEAD)" = "$NM_SHA" || {
+          echo "::error::NoMount release tag changed after resolution"
           exit 1
         }
         DEFCONFIG="$COMMON_KERNEL_FOLDER/arch/arm64/configs/gki_defconfig"
@@ -1445,8 +1448,9 @@ runs:
         echo "CONFIG_NOMOUNT=y" >> "$DEFCONFIG"
 
         echo "NM_SHA=$NM_SHA" >> "$GITHUB_ENV"
+        echo "NM_TAG=$NM_TAG" >> "$GITHUB_ENV"
 
-        echo "Maxsteel NoMount dev HEAD: $NM_SHA"
+        echo "Maxsteel NoMount stable release: $NM_TAG ($NM_SHA)"
         echo "::endgroup::"
 
     - name: Add BBG
@@ -2485,14 +2489,7 @@ runs:
         echo "Clear Temporary cache files..."
         ccache -c
         
-        echo "Perform ccache eviction!"
-        # 0.5 days = 12 Hrs. Delete cache unused in 12 hrs. 12 hrs is considered for safety.
-        # Yes. ccache uses mtime as a store of time due to cross compatibility with different OS.
-        find "$CCACHE_DIR" -type f -mtime +0.5 -delete
-        # Remove empty layout subdirectories
-        find "$CCACHE_DIR" -type d -empty -delete
-
-        cp "${{ env.CCACHE_LOGFILE }}" "$CCACHE_DIR"
+        echo "Retaining all valid cache entries; ccache enforces only its size limit"
         
         if [ "${{ inputs.debug }}" == "true" ]; then
           if [ -f "${{ env.CCACHE_LOGFILE }}" ]; then
@@ -2620,6 +2617,12 @@ runs:
         fi
         
         cp "$IMAGE_PATH" "$AK3_FOLDER/Image"
+
+        jq -n --arg nomount_tag "$NM_TAG" --arg nomount_sha "$NM_SHA" \
+          --arg vpnhide_sha "${VPNHIDE_COMMIT_SHA:-}" --arg source_sha "$GITHUB_SHA" \
+          --arg source_branch "$GITHUB_REF_NAME" \
+          '{nomount_tag:$nomount_tag,nomount_sha:$nomount_sha,vpnhide_sha:$vpnhide_sha,
+            source_sha:$source_sha,source_branch:$source_branch}' > "$AK3_FOLDER/build-components.json"
 
         if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
           bash "$GITHUB_WORKSPACE/scripts/uidfake-stage-anykernel.sh" "$AK3_FOLDER"
@@ -2850,7 +2853,7 @@ runs:
         retention-days: 90
 
     - name: Upload ccache log
-      if: success() && inputs.debug == 'true' && steps.build_kernel_step.conclusion == 'success'
+      if: ${{ always() && !cancelled() && (steps.build_kernel_step.conclusion == 'success' || steps.build_kernel_step.conclusion == 'failure') }}
       uses: actions/upload-artifact@v7
       with:
         name: "${{ env.OP_MODEL }}_${{ env.OP_OS_VERSION }}_${{ env.KERNEL_FULL_VER }}_ccache.log"
@@ -2861,13 +2864,13 @@ runs:
 
     - name: 📥 Checkout Code
       uses: actions/checkout@v6
-      if: always() && steps.build_kernel_step.conclusion == 'success'
+      if: ${{ always() && !cancelled() && inputs.clean != 'true' && steps.restore-ccache-cache.outcome == 'success' }}
       with:
         path: main-source
         fetch-depth: 1
 
     - name: Save ccache cache
-      if: always() && steps.build_kernel_step.conclusion == 'success'
+      if: ${{ always() && !cancelled() && inputs.clean != 'true' && steps.restore-ccache-cache.outcome == 'success' }}
       uses: ./action-source/.github/actions/cache/save
       with:
         cache_path: ${{ env.CCACHE_DIR }}
