@@ -960,7 +960,7 @@ runs:
 
         echo "Using pershoot/KernelSU-Next ref: $KSU_INPUT"
 
-        if [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+        if [[ "${{ github.ref_name }}" == UIDFAKE-op13r-6.1.118-build80* ]]; then
           # The workflow resolves dev-susfs afresh on every run. Build that exact
           # SHA: setup.sh alone can silently replace a SHA with the branch head.
           curl --fail --location --proto '=https' -LSs             "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh"             | bash -s "dev-susfs"
@@ -1368,6 +1368,21 @@ runs:
         
         echo "::endgroup::"
 
+    - name: Apply SELinux timing test patch (KernelSU PR 3938)
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$OP_MODEL" = OP13r
+        test "$KSU_COMMIT_SHA" = d21e0a66c887ae4bc75b7c9f83e41761819ec09a
+        test "$SUSFS_COMMIT_SHA" = c27ebe93c68e953c248b11bb747ef220ea648373
+        cd "$KSUN_FOLDER"
+        PATCH="$GITHUB_WORKSPACE/patches/selinux-test/0001-ksu-reduce-selinux-hide-timing.patch"
+        git apply --check "$PATCH"
+        git apply "$PATCH"
+        git diff --check
+        git diff --stat
+        echo 'SELinux timing patch: tiann/KernelSU#3938 at ec7eb93621c40c0cc2c304cca9c0ca43b7d4c23a' >> "$GITHUB_STEP_SUMMARY"
+
     - name: Apply latest stable Maxsteel NoMount release
       shell: bash
       env:
@@ -1376,7 +1391,8 @@ runs:
         set -euo pipefail
         echo "::group::Apply Maxsteel NoMount"
 
-        NM_RELEASE_JSON="$(python3 "$GITHUB_WORKSPACE/scripts/resolve-nomount-stable.py")"
+        # Controlled comparison with run 39956289689, only in this test branch.
+        NM_RELEASE_JSON='{"nomount_tag":"v2.2.0","nomount_sha":"bf1847f98fed382369c43bfd652cd93774b9b8e3"}'
         NM_TAG="$(jq -er .nomount_tag <<< "$NM_RELEASE_JSON")"
         NM_SHA="$(jq -er .nomount_sha <<< "$NM_RELEASE_JSON")"
         NM_SRC="$COMMON_KERNEL_FOLDER/NoMount"
@@ -1752,6 +1768,8 @@ runs:
           https://github.com/okhsunrog/vpnhide.git \
           "$VPH_SRC"
 
+        git -C "$VPH_SRC" fetch --depth 1 origin d85dc3423d6fb647f33f8c23b8d5f453c4238419
+        git -C "$VPH_SRC" checkout --detach d85dc3423d6fb647f33f8c23b8d5f453c4238419
         VPNHIDE_COMMIT_SHA="$(git -C "$VPH_SRC" rev-parse HEAD)"
         echo "VPNHIDE_COMMIT_SHA=$VPNHIDE_COMMIT_SHA" >> "$GITHUB_ENV"
 
@@ -2147,7 +2165,7 @@ runs:
         
     - name: Integrate UIDFAKE into in-tree kernel sources
       shell: bash
-      if: ${{ github.ref_name == 'UIDFAKE-op13r-6.1.118-build80' && env.OP_MODEL == 'OP13r' }}
+      if: ${{ startsWith(github.ref_name, 'UIDFAKE-op13r-6.1.118-build80') && env.OP_MODEL == 'OP13r' }}
       run: |
         set -euo pipefail
         python3 "$GITHUB_WORKSPACE/scripts/uidfake-test-native.py"
@@ -2287,7 +2305,7 @@ runs:
         
         make LD="$COMMON_KERNEL_FOLDER/ld-wrapper" HOSTLD="$COMMON_KERNEL_FOLDER/ld-wrapper" O="$OUT" olddefconfig
 
-        if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+        if [ "$OP_MODEL" = "OP13r" ] && [[ "${{ github.ref_name }}" == UIDFAKE-op13r-6.1.118-build80* ]]; then
           grep -qx 'CONFIG_HMA_UIDFAKE_BUILTIN=y' "$OUT/.config" || {
             echo "::error::UIDFAKE not enabled by final Kconfig"; exit 1;
           }
@@ -2407,7 +2425,7 @@ runs:
         BUILD_START=$(date +%s)
         set -o pipefail
 
-        if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+        if [ "$OP_MODEL" = "OP13r" ] && [[ "${{ github.ref_name }}" == UIDFAKE-op13r-6.1.118-build80* ]]; then
           echo "UIDFAKE: compile native component and call sites before the full Image"
           UF_MAKE=(make LD="$COMMON_KERNEL_FOLDER/ld-wrapper" HOSTLD="$COMMON_KERNEL_FOLDER/ld-wrapper"
             -j"$(nproc --all)" O="$OUT" KCFLAGS="$KCFLAGS" KCPPFLAGS="$KCPPFLAGS"
@@ -2448,7 +2466,7 @@ runs:
           exit 1
         fi
 
-        if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+        if [ "$OP_MODEL" = "OP13r" ] && [[ "${{ github.ref_name }}" == UIDFAKE-op13r-6.1.118-build80* ]]; then
           test -s "$OUT/drivers/misc/hma_uidfake/built-in.a"
           grep -aFq 'hma_uidfake: native built-in policy ready' "$IMG"
           mkdir -p "$AK3_FOLDER/uidfake"
@@ -2620,11 +2638,16 @@ runs:
 
         jq -n --arg nomount_tag "$NM_TAG" --arg nomount_sha "$NM_SHA" \
           --arg vpnhide_sha "${VPNHIDE_COMMIT_SHA:-}" --arg source_sha "$GITHUB_SHA" \
+          --arg ksu_sha "$KSU_COMMIT_SHA" --arg susfs_sha "$SUSFS_COMMIT_SHA" \
+          --arg timing_patch_sha256 "$(sha256sum "$GITHUB_WORKSPACE/patches/selinux-test/0001-ksu-reduce-selinux-hide-timing.patch" | cut -d' ' -f1)" \
           --arg source_branch "$GITHUB_REF_NAME" \
           '{nomount_tag:$nomount_tag,nomount_sha:$nomount_sha,vpnhide_sha:$vpnhide_sha,
-            source_sha:$source_sha,source_branch:$source_branch}' > "$AK3_FOLDER/build-components.json"
+            source_sha:$source_sha,source_branch:$source_branch,ksu_sha:$ksu_sha,susfs_sha:$susfs_sha,
+            timing_patch_sha256:$timing_patch_sha256,
+            timing_patch:"https://github.com/tiann/KernelSU/pull/3938",
+            timing_patch_commit:"ec7eb93621c40c0cc2c304cca9c0ca43b7d4c23a"}' > "$AK3_FOLDER/build-components.json"
 
-        if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+        if [ "$OP_MODEL" = "OP13r" ] && [[ "${{ github.ref_name }}" == UIDFAKE-op13r-6.1.118-build80* ]]; then
           bash "$GITHUB_WORKSPACE/scripts/uidfake-stage-anykernel.sh" "$AK3_FOLDER"
           cp "$GITHUB_WORKSPACE/uidfake/hma-uidfake-native.patch" "$ARTIFACTS_FOLDER/"
         fi
@@ -2648,8 +2671,10 @@ runs:
         else
           ZIP_NAME="AK3_${ZIP_MODEL}_${OP_OS_VERSION}_${KERNEL_FULL_VER}_${{ inputs.ksu_type }}_${KSUVER:-unknown}.zip"
         fi
-        if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
-          ZIP_NAME="${ZIP_NAME%.zip}_UIDFAKE.zip"
+        if [ "$OP_MODEL" = "OP13r" ] && [[ "${{ github.ref_name }}" == UIDFAKE-op13r-6.1.118-build80* ]]; then
+          ZIP_NAME="${ZIP_NAME%.zip}_UIDFAKE_TEST-SELINUX.zip"
+          cp "$GITHUB_WORKSPACE/patches/selinux-test/README.md" "$AK3_FOLDER/SELINUX-TEST.txt"
+          cp "$GITHUB_WORKSPACE/patches/selinux-test/0001-ksu-reduce-selinux-hide-timing.patch" "$AK3_FOLDER/selinux-timing.patch"
         fi
         mkdir -p "$ARTIFACTS_FOLDER"
         
@@ -2665,7 +2690,7 @@ runs:
         
         mv "$ZIP_NAME" "$ARTIFACTS_FOLDER/"
 
-        if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
+        if [ "$OP_MODEL" = "OP13r" ] && [[ "${{ github.ref_name }}" == UIDFAKE-op13r-6.1.118-build80* ]]; then
           python3 "$GITHUB_WORKSPACE/scripts/uidfake-verify-zip.py" "$ARTIFACTS_FOLDER/$ZIP_NAME"
         fi
         

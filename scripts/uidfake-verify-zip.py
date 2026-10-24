@@ -33,6 +33,6 @@ with zipfile.ZipFile(archive) as z:
         assert '+++ b/' + file in patch, f'incomplete source patch: {file}'
     assert 'ANDROID_KABI_USE' in patch, 'Android task KABI reservation missing'
     assert 'hma_uidfake-y := core.o policy.o netlink.o' in patch
-    assert archive.name.endswith('_UIDFAKE.zip'), 'archive label missing'
+    assert archive.name.endswith(('_UIDFAKE.zip', '_UIDFAKE_TEST-SELINUX.zip')), 'archive label missing'
 print('UIDFAKE ZIP verified: Image, native patch, checksum-pinned helper, boot service and no UIDFAKE LKM')
 print(hashlib.sha256(archive.read_bytes()).hexdigest(), archive.name)

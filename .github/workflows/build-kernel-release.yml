@@ -1,4 +1,4 @@
-name: Build and Release OnePlus Kernels
+name: OP13R UIDFAKE TEST-SELINUX
 
 permissions:
   contents: write
@@ -37,7 +37,7 @@ on:
         description: 'Enter KernelSU build json'
         required: true
         type: string
-        default: '[{"type":"ksun","hash":"dev-susfs"}]'
+        default: '[{"type":"ksun","hash":"d21e0a66c887ae4bc75b7c9f83e41761819ec09a"}]'
       optimize_level:
         description: "Compiler optimization level"
         required: true
@@ -73,7 +73,7 @@ on:
       android14-6_1_susfs_branch_or_commit:
         description: 'Enter SusFS Branch or commit hash for android14-6.1'
         type: string
-        default: ''
+        default: 'c27ebe93c68e953c248b11bb747ef220ea648373'
       android15-6_6_susfs_branch_or_commit:
         description: 'Enter SusFS Branch or commit hash for android15-6.6'
         type: string
