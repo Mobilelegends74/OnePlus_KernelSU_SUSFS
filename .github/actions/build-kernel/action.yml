@@ -1368,6 +1368,14 @@ runs:
         
         echo "::endgroup::"
 
+    - name: Apply reviewed KernelSU SELinux timing backport
+      if: ${{ inputs.ksu_type == 'KSUN' && env.OP_MODEL == 'OP13r' && env.KERNEL_VER == '6.1' }}
+      shell: bash
+      run: |
+        bash "$GITHUB_WORKSPACE/scripts/apply-selinux-timing.sh" "$KSUN_FOLDER"
+        echo 'SELINUX_TIMING_PATCH=ec7eb93621c40c0cc2c304cca9c0ca43b7d4c23a' >> "$GITHUB_ENV"
+        echo 'Applied reviewed SELinux timing backport: KernelSU PR #3938 (not a throne-hunt fix).' >> "$GITHUB_STEP_SUMMARY"
+
     - name: Apply latest stable Maxsteel NoMount release
       shell: bash
       env:
@@ -2620,9 +2628,17 @@ runs:
 
         jq -n --arg nomount_tag "$NM_TAG" --arg nomount_sha "$NM_SHA" \
           --arg vpnhide_sha "${VPNHIDE_COMMIT_SHA:-}" --arg source_sha "$GITHUB_SHA" \
+          --arg ksu_sha "${KSU_COMMIT_SHA:-}" --arg susfs_sha "${SUSFS_COMMIT_SHA:-}" \
+          --arg selinux_timing_patch "${SELINUX_TIMING_PATCH:-}" \
           --arg source_branch "$GITHUB_REF_NAME" \
           '{nomount_tag:$nomount_tag,nomount_sha:$nomount_sha,vpnhide_sha:$vpnhide_sha,
-            source_sha:$source_sha,source_branch:$source_branch}' > "$AK3_FOLDER/build-components.json"
+            source_sha:$source_sha,source_branch:$source_branch,ksu_sha:$ksu_sha,
+            susfs_sha:$susfs_sha,selinux_timing_patch:$selinux_timing_patch}' > "$AK3_FOLDER/build-components.json"
+
+        if [ -n "${SELINUX_TIMING_PATCH:-}" ]; then
+          cp "$GITHUB_WORKSPACE/patches/selinux/0001-ksu-reduce-selinux-hide-timing.patch" "$AK3_FOLDER/selinux-timing.patch"
+          cp "$GITHUB_WORKSPACE/patches/selinux/README.md" "$AK3_FOLDER/SELINUX-PATCH.txt"
+        fi
 
         if [ "$OP_MODEL" = "OP13r" ] && [ "${{ github.ref_name }}" = "UIDFAKE-op13r-6.1.118-build80" ]; then
           bash "$GITHUB_WORKSPACE/scripts/uidfake-stage-anykernel.sh" "$AK3_FOLDER"

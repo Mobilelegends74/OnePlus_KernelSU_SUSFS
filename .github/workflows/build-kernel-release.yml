@@ -1042,10 +1042,12 @@ jobs:
           [[ "$NOMOUNT_COMMIT" =~ ^[0-9a-f]{40}$ ]] || exit 1
           [[ "$VPNHIDE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || exit 1
           UIDFAKE_FEATURE=""
+          SELINUX_FEATURE=""
           UIDFAKE_CONFIG_ROW=""
           if [ "$GITHUB_REF_NAME" = "UIDFAKE-op13r-6.1.118-build80" ]; then
             UIDFAKE_FEATURE='- **HMA UIDFAKE built-in** — UID filtering, isolated processes and automatic HMA/HMA-OSS rule synchronization; no separate UIDFAKE LKM/module'
             UIDFAKE_CONFIG_ROW='| **HMA UIDFAKE** | Built-in kernel patch, CONFIG_HMA_UIDFAKE_BUILTIN=y |'
+            SELINUX_FEATURE='- **SELinux timing backport** — KernelSU PR #3938; reduced context-processing overhead with permission checks retained'
           fi
           
           cat << EOF >> release_notes.md
@@ -1121,6 +1123,7 @@ jobs:
           - **Unicode bypass fix**
           - **[VPNHide Built-in](https://github.com/okhsunrog/vpnhide/commit/$VPNHIDE_COMMIT)** for OP13R (Android 14 / Linux 6.1)
           $UIDFAKE_FEATURE
+          $SELINUX_FEATURE
 
           ### Performance and memory
           - **BORE 5.3.0 scheduler**
@@ -1196,6 +1199,12 @@ jobs:
           - Автоматическая синхронизация правил HMA/HMA-OSS; фильтрация UID и обработка изолированных процессов.
           - ZIP содержит повторно применяемый патч UIDFAKE и сведения проверки встроенного компонента.
           - KernelSU Next и SUSFS продолжают обновляться автоматически; NoMount выбирается только из стабильных релизов.
+
+          ## Изменения относительно предыдущего релиза OP13R
+
+          - Добавлен [SELinux timing-патч KernelSU PR #3938](https://github.com/tiann/KernelSU/pull/3938): ранняя проверка контекстов по сохранённой политике и сокращение выделений памяти для коротких строк; проверки разрешений и синхронизация SID сохранены.
+          - На OnePlus 13R прежнее обнаружение SELinux в Duck Build 1072 не воспроизводится в завершённых повторных замерах. SELinux остаётся Enforcing. Отдельное обнаружение throne hunt этим патчем не исправляется.
+          - Исходный SELinux-патч и сведения о нём включены в ZIP; UIDFAKE и синхронизация HMA/HMA-OSS сохранены.
 
           Перед установкой сохраните резервную копию boot. Новые сочетания компонентов требуют проверки на устройстве; успешная компиляция не гарантирует совместимость со всеми модулями.
           EOF
